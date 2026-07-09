@@ -13,7 +13,7 @@ const { resolvePhotoFilePath } = require('../services/photoResolver');
 const { getEventShareToken, resolveShareIdentifier, buildShareLinkVariants } = require('../services/shareLinkService');
 const { handleAsync } = require('../utils/routeHelpers');
 const { NotFoundError } = require('../utils/errors');
-const { ensureThumbnail, ensureHeroImage } = require('../services/imageProcessor');
+const { ensureThumbnail, ensureHeroImage, ensureDisplayImage } = require('../services/imageProcessor');
 
 // Get storage path from environment or default
 const getStoragePath = () => process.env.STORAGE_PATH || path.join(__dirname, '../../../storage');
@@ -823,7 +823,7 @@ router.get('/:slug/photo/:photoId',
             'Accept-Ranges': 'bytes',
             'Content-Length': chunksize,
             'Content-Type': photo.mime_type || 'video/mp4',
-            'Cache-Control': 'private, max-age=1800',
+            'Cache-Control': 'private, max-age=7200',
             'X-Protection-Level': 'basic'
           });
 
@@ -834,7 +834,7 @@ router.get('/:slug/photo/:photoId',
             'Content-Length': fileSize,
             'Content-Type': photo.mime_type || 'video/mp4',
             'Accept-Ranges': 'bytes',
-            'Cache-Control': 'private, max-age=1800',
+            'Cache-Control': 'private, max-age=7200',
             'X-Protection-Level': 'basic'
           });
 
@@ -869,7 +869,7 @@ router.get('/:slug/photo/:photoId',
             if (fs.existsSync(watermarkFilePath)) {
               res.set({
                 'Content-Type': photo.mime_type || 'image/jpeg',
-                'Cache-Control': 'private, max-age=1800',
+                'Cache-Control': 'private, max-age=7200',
                 'ETag': etag,
                 'X-Protection-Level': 'basic'
               });
@@ -891,16 +891,34 @@ router.get('/:slug/photo/:photoId',
 
         res.set({
           'Content-Type': photo.mime_type || 'image/jpeg',
-          'Cache-Control': 'private, max-age=1800', // Cache for 30 minutes
+          'Cache-Control': 'private, max-age=7200', // Cache for 30 minutes
           'ETag': etag,
           'X-Protection-Level': 'basic'
         });
 
         res.send(watermarkedBuffer);
       } else {
-        // Send original file with basic protection headers
+        // Serve a downscaled WebP display variant for viewing — the true
+        // original (used by downloads) can be tens of MB straight off a
+        // camera, far more than any screen needs to render. Falls back to
+        // the original file if display-variant generation fails for any
+        // reason, so a photo is never fully blocked from viewing.
+        const displayRelPath = await ensureDisplayImage(filePath);
+
+        if (displayRelPath) {
+          const displayAbsolutePath = path.join(getStoragePath(), displayRelPath);
+          res.set({
+            'Content-Type': 'image/webp',
+            'Cache-Control': 'private, max-age=7200',
+            'ETag': etag,
+            'X-Protection-Level': 'basic'
+          });
+          return res.sendFile(displayAbsolutePath);
+        }
+
+        // Fallback: send original file with basic protection headers
         res.set({
-          'Cache-Control': 'private, max-age=1800',
+          'Cache-Control': 'private, max-age=7200',
           'ETag': etag,
           'X-Protection-Level': 'basic'
         });
@@ -972,7 +990,7 @@ router.get('/:slug/thumbnail/:photoId',
       // Set appropriate headers with enhanced security
       res.set({
         'Content-Type': 'image/jpeg',
-        'Cache-Control': 'private, max-age=1800', // Reduced cache time
+        'Cache-Control': 'private, max-age=7200', // Reduced cache time
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'X-Content-Type-Options': 'nosniff',
         'X-Protected-Thumbnail': 'true',
@@ -1057,7 +1075,7 @@ router.get('/:slug/hero/:photoId',
 
       res.set({
         'Content-Type': 'image/jpeg',
-        'Cache-Control': 'private, max-age=3600', // Cache for 1 hour
+        'Cache-Control': 'private, max-age=14400', // Cache for 1 hour
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'X-Content-Type-Options': 'nosniff',
         'X-Hero-Image': 'true',

@@ -12,7 +12,7 @@ const fs = require('fs').promises;
 const { db } = require('../database/db');
 const { formatBoolean } = require('../utils/dbCompat');
 const { validatePasswordInContext, getBcryptRounds } = require('../utils/passwordValidation');
-const { buildShareLinkVariants } = require('./shareLinkService');
+const { buildShareLinkVariants, toFullShareUrl } = require('./shareLinkService');
 const { parseBooleanInput, parseStringInput } = require('../utils/parsers');
 const eventTypeService = require('./eventTypeService');
 
@@ -61,6 +61,7 @@ const mapEventForApi = (event) => {
 
   return {
     ...rest,
+    share_link: toFullShareUrl(rest.share_link),
     customer_name: customer_name ?? host_name ?? null,
     customer_email: customer_email ?? host_email ?? null
   };

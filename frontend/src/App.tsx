@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastContainer } from 'react-toastify';
@@ -10,23 +10,23 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { GalleryPage } from './pages/GalleryPage';
 import { PreviewPage } from './pages/gallery/PreviewPage';
 import { LegalPage } from './pages/public/LegalPage';
-import {
-  AdminLoginPage,
-  AdminDashboard,
-  EventsListPage,
-  CreateEventPage,
-  EventDetailsPage,
-  EventFeedbackPage,
-  EmailConfigPage,
-  ArchivesPage,
-  AnalyticsPage,
-  BrandingPage,
-  SettingsPage,
-  BackupManagement,
-  CMSPage,
-  UserManagementPage,
-  EventTypesPage
-} from './pages/admin';
+// Admin pages are lazy-loaded: gallery visitors (the common case) should
+// never have to download the admin panel's JS at all.
+const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage').then(m => ({ default: m.AdminLoginPage })));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const EventsListPage = lazy(() => import('./pages/admin/EventsListPage').then(m => ({ default: m.EventsListPage })));
+const CreateEventPage = lazy(() => import('./pages/admin/CreateEventPage').then(m => ({ default: m.CreateEventPage })));
+const EventDetailsPage = lazy(() => import('./pages/admin/EventDetailsPage').then(m => ({ default: m.EventDetailsPage })));
+const EventFeedbackPage = lazy(() => import('./pages/admin/EventFeedbackPage').then(m => ({ default: m.EventFeedbackPage })));
+const EmailConfigPage = lazy(() => import('./pages/admin/EmailConfigPage').then(m => ({ default: m.EmailConfigPage })));
+const ArchivesPage = lazy(() => import('./pages/admin/ArchivesPage').then(m => ({ default: m.ArchivesPage })));
+const AnalyticsPage = lazy(() => import('./pages/admin/AnalyticsPage').then(m => ({ default: m.AnalyticsPage })));
+const BrandingPage = lazy(() => import('./pages/admin/BrandingPage').then(m => ({ default: m.BrandingPage })));
+const SettingsPage = lazy(() => import('./pages/admin/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const BackupManagement = lazy(() => import('./pages/admin/BackupManagement').then(m => ({ default: m.BackupManagement })));
+const CMSPage = lazy(() => import('./pages/admin/CMSPage').then(m => ({ default: m.CMSPage })));
+const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage').then(m => ({ default: m.UserManagementPage })));
+const EventTypesPage = lazy(() => import('./pages/admin/EventTypesPage').then(m => ({ default: m.EventTypesPage })));
 import { AcceptInvitePage } from './pages/public/AcceptInvitePage';
 import { AdminLayout, AdminAuthWrapper } from './components/admin';
 import { PageErrorBoundary, OfflineIndicator, SkipLink, DynamicFavicon, RobotsMetaTags } from './components/common';
@@ -118,6 +118,7 @@ function App() {
               <Router>
                 <MaintenanceWrapper>
                   <SkipLink />
+                  <Suspense fallback={null}>
                   <Routes>
                   {/* Public gallery routes */}
                   <Route path="/gallery/preview" element={<PreviewPage />} />
@@ -160,6 +161,7 @@ function App() {
                   {/* Default redirect */}
                   <Route path="/" element={<Navigate to="/admin/login" replace />} />
                 </Routes>
+                </Suspense>
               </MaintenanceWrapper>
             </Router>
 

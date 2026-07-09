@@ -5,7 +5,7 @@ const fs = require('fs').promises;
 const { db, logActivity } = require('../database/db');
 const { adminAuth } = require('../middleware/auth');
 const { requirePermission } = require('../middleware/permissions');
-const { generateThumbnail, ensureThumbnail, extractCaptureDate } = require('../services/imageProcessor');
+const { generateThumbnail, ensureThumbnail, generateDisplayImage, extractCaptureDate } = require('../services/imageProcessor');
 const { processUploadedVideo, isVideoMimeType } = require('../services/videoProcessor');
 const { generatePhotoFilename } = require('../utils/filenameSanitizer');
 const { escapeLikePattern } = require('../utils/sqlSecurity');
@@ -361,6 +361,14 @@ router.post('/:eventId/upload', adminAuth, requirePermission('photos.upload'), u
                   }
                 } else {
                   thumbnailPath = await generateThumbnail(operation.finalPath);
+
+                  // Pre-generate the lightbox display variant now (upload time)
+                  // rather than on a client's first view — moves the cost off
+                  // the viewing path entirely. Non-fatal: a failure here just
+                  // means it falls back to on-demand generation on first view.
+                  generateDisplayImage(operation.finalPath).catch((err) => {
+                    console.warn(`Display image pre-generation failed for ${operation.filename}:`, err.message);
+                  });
 
                   // Update the database with thumbnail path and image dimensions
                   if (photoId) {

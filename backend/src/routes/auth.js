@@ -13,6 +13,7 @@ const {
   getGenericAuthError
 } = require('../utils/authSecurity');
 const { endSession } = require('../middleware/sessionTimeout');
+const { timingSafeEqualStr } = require('../utils/timingSafe');
 const logger = require('../utils/logger');
 const {
   setAdminAuthCookie,
@@ -321,7 +322,7 @@ router.post('/gallery/share-login', [
 
     const expectedToken = getEventShareToken(event);
 
-    if (!expectedToken || token !== expectedToken) {
+    if (!expectedToken || !timingSafeEqualStr(token, expectedToken)) {
       return res.status(401).json({ error: 'Invalid or expired share link' });
     }
 

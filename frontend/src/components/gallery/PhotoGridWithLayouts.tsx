@@ -66,6 +66,8 @@ interface PhotoGridWithLayoutsProps {
   heroImageAnchor?: string;
   // Logout callback for full-page layouts
   onLogout?: () => void;
+  // Photographer/studio name credit shown bottom-center of the hero
+  photographerName?: string;
 }
 
 export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
@@ -97,7 +99,8 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
   headerStyle,
   heroDividerStyle = 'wave',
   heroImageAnchor = 'center',
-  onLogout
+  onLogout,
+  photographerName
 }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -281,6 +284,7 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
           useEnhancedProtection={useEnhancedProtection}
           useCanvasRendering={useCanvasRendering}
           heroImageAnchor={heroImageAnchor}
+          photographerName={photographerName}
         />
       )}
 

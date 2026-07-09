@@ -620,6 +620,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
           heroDividerStyle={data?.event?.hero_divider_style || theme.heroDividerStyle || 'wave'}
           heroImageAnchor={data?.event?.hero_image_anchor || 'center'}
           onLogout={logout}
+          photographerName={brandingSettings?.company_name}
         />
 
         {/* Upload Modal for full-page layouts */}
@@ -674,6 +675,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
           likeCount={likeCount}
           favoriteCount={favoriteCount}
           ratedCount={ratedCount}
+          showLogout={true}
+          onLogout={logout}
         />
       ) : null}
 
@@ -681,8 +684,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
         event={event}
         brandingSettings={brandingSettings}
         headerStyle={data?.event?.header_style || theme.headerStyle}
-        showLogout={true}
-        onLogout={logout}
+        showLogout={false}
         showDownloadAll={!showSidebar && allowDownloads}
         onDownloadAll={handleDownloadAll}
         isDownloading={downloadAllMutation.isPending}

@@ -10,11 +10,11 @@ sharp.cache(false); // Disable cache to prevent memory buildup
 sharp.concurrency(2); // Limit concurrent operations
 
 // Default thumbnail settings
-const DEFAULT_THUMBNAIL_WIDTH = 300;
-const DEFAULT_THUMBNAIL_HEIGHT = 300;
-const DEFAULT_THUMBNAIL_FIT = 'cover'; // 'cover' for square crops
-const DEFAULT_THUMBNAIL_QUALITY = 85;
-const DEFAULT_THUMBNAIL_FORMAT = 'jpeg';
+const DEFAULT_THUMBNAIL_WIDTH = 1200;
+const DEFAULT_THUMBNAIL_HEIGHT = 1200;
+const DEFAULT_THUMBNAIL_FIT = 'inside'; // preserve aspect ratio, no crop
+const DEFAULT_THUMBNAIL_QUALITY = 90;
+const DEFAULT_THUMBNAIL_FORMAT = 'webp';
 
 const getStoragePath = () => process.env.STORAGE_PATH || path.join(__dirname, '../../../storage');
 const getThumbnailPath = () => path.join(getStoragePath(), 'thumbnails');
@@ -291,10 +291,10 @@ async function generateVideoPlaceholder(originalFilename, options = {}) {
   }
 }
 
-// Hero image settings - optimized for large displays
-const DEFAULT_HERO_WIDTH = 1920;
-const DEFAULT_HERO_HEIGHT = 1080;
-const DEFAULT_HERO_QUALITY = 85;
+// Hero image settings - optimized for large/retina displays
+const DEFAULT_HERO_WIDTH = 3840;
+const DEFAULT_HERO_HEIGHT = 2160;
+const DEFAULT_HERO_QUALITY = 90;
 const DEFAULT_HERO_FORMAT = 'jpeg';
 
 const getHeroPath = () => path.join(getStoragePath(), 'heroes');
@@ -449,6 +449,95 @@ async function ensureHeroImage(photo) {
   return null;
 }
 
+// Display image settings — a lightbox-viewing variant, capped at a sane
+// on-screen resolution and encoded as WebP for a smaller transfer than the
+// original camera file. Never used for downloads (those always serve the
+// true original at full quality/resolution).
+const DEFAULT_DISPLAY_WIDTH = 2560;
+const DEFAULT_DISPLAY_HEIGHT = 2560;
+const DEFAULT_DISPLAY_QUALITY = 88;
+
+const getDisplayPath = () => path.join(getStoragePath(), 'display');
+
+const displayFilename = (originalFilename) => {
+  const base = path.basename(originalFilename, path.extname(originalFilename));
+  return `display_${base}.webp`;
+};
+
+/**
+ * Generate a lightbox-display variant: downscaled to fit within
+ * DEFAULT_DISPLAY_WIDTH/HEIGHT (no crop, aspect preserved), WebP encoded.
+ */
+async function generateDisplayImage(imagePath) {
+  const displayDir = getDisplayPath();
+  const displayPath = path.join(displayDir, displayFilename(imagePath));
+
+  await fs.mkdir(displayDir, { recursive: true });
+
+  try {
+    const metadata = await sharp(imagePath).metadata();
+    if (!metadata.width || !metadata.height) {
+      throw new Error('Invalid image metadata - file may be incomplete');
+    }
+
+    let sharpInstance = sharp(imagePath, {
+      limitInputPixels: 268402689,
+      sequentialRead: true,
+      failOnError: false
+    });
+
+    sharpInstance = sharpInstance.withMetadata(false);
+
+    // 'inside' — downscale only, preserve full frame and aspect ratio.
+    // Never crops and never upscales (withoutEnlargement default true here
+    // matters: a display copy should never exceed the original's own size).
+    sharpInstance = sharpInstance.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, {
+      fit: 'inside',
+      withoutEnlargement: true
+    });
+
+    sharpInstance = sharpInstance.webp({ quality: DEFAULT_DISPLAY_QUALITY, effort: 4 });
+
+    await sharpInstance.toFile(displayPath);
+
+    const stats = await fs.stat(displayPath);
+    if (stats.size === 0) {
+      throw new Error('Generated display image is empty');
+    }
+
+    return path.relative(getStoragePath(), displayPath);
+  } catch (error) {
+    const msg = (error && error.message) ? error.message : String(error);
+    logger.error(`Failed to generate display image for ${path.basename(imagePath)}: ${msg}`);
+    try {
+      await fs.unlink(displayPath);
+    } catch (unlinkErr) {
+      // Ignore
+    }
+    return null;
+  }
+}
+
+/**
+ * Ensure a display variant exists for this original photo file, generating
+ * it on first request. No DB column needed — path is deterministic from the
+ * original filename, existence is checked directly on disk.
+ */
+async function ensureDisplayImage(imagePath) {
+  const displayPath = path.join(getDisplayPath(), displayFilename(imagePath));
+
+  try {
+    const stats = await fs.stat(displayPath);
+    if (stats.size > 0) {
+      return path.relative(getStoragePath(), displayPath);
+    }
+  } catch (err) {
+    // Doesn't exist yet — fall through to generate
+  }
+
+  return generateDisplayImage(imagePath);
+}
+
 /**
  * Extract capture date from EXIF metadata
  * @param {string} imagePath - Path to the image file
@@ -506,5 +595,7 @@ module.exports = {
   generateHeroImage,
   isHeroValid,
   ensureHeroImage,
+  generateDisplayImage,
+  ensureDisplayImage,
   extractCaptureDate
 };

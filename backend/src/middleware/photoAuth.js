@@ -28,38 +28,48 @@ async function photoAuth(req, res, next) {
         let decoded;
         try {
           decoded = jwt.verify(token, process.env.JWT_SECRET, {
+            algorithms: ['HS256'],
             issuer: 'picpeak-auth'
           });
         } catch (issuerError) {
           // If verification fails with issuer, try without issuer (backward compatibility)
           if (issuerError.name === 'JsonWebTokenError' && issuerError.message.includes('jwt issuer invalid')) {
-            decoded = jwt.verify(token, process.env.JWT_SECRET);
+            decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
           } else {
             throw issuerError;
           }
         }
-        
+
         // Check if it's a gallery token
         if (decoded.type === 'gallery') {
           // For thumbnails, we need to verify the token is for a valid event
           if (!eventSlug) {
-            // Extract event ID from the decoded token
+            // Resolve the token's event (by id, or legacy slug fallback)...
+            let event = null;
             if (decoded.eventId) {
-              const event = await db('events')
+              event = await db('events')
                 .where({ id: decoded.eventId, is_active: formatBoolean(true) })
                 .first();
-              if (event) {
+            }
+            if (!event && decoded.eventSlug) {
+              event = await db('events')
+                .where({ slug: decoded.eventSlug, is_active: formatBoolean(true) })
+                .first();
+            }
+            // ...then confirm the REQUESTED thumbnail actually belongs to
+            // that event. Thumbnails are served flat by filename, so
+            // without this check any gallery token (for any event) could
+            // enumerate and fetch another password-protected event's
+            // thumbnails, defeating that gallery's password.
+            if (event) {
+              const requestedKey = `thumbnails${req.path}`;
+              const ownsThumbnail = await db('photos')
+                .where({ event_id: event.id, thumbnail_path: requestedKey })
+                .first();
+              if (ownsThumbnail) {
                 req.event = event;
                 return next();
               }
-            }
-            // Fallback to slug
-            const event = await db('events')
-              .where({ slug: decoded.eventSlug, is_active: formatBoolean(true) })
-              .first();
-            if (event) {
-              req.event = event;
-              return next();
             }
           }
           // For regular photos, check if token matches the event

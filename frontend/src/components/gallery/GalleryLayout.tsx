@@ -133,7 +133,10 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
       <DynamicFavicon />
 
       {/* Header structure */}
-      <header className={`gallery-header bg-surface border-b border-surface sticky top-0 z-40 ${isNonGridLayout || isHeroHeader ? 'shadow-sm' : ''}`}>
+      <header className={isHeroHeader
+        ? 'gallery-header absolute top-0 inset-x-0 z-50 bg-transparent'
+        : `gallery-header bg-surface border-b border-surface sticky top-0 z-40 ${isNonGridLayout ? 'shadow-sm' : ''}`
+      }>
         {/* For non-grid layouts - keep the current structure (standard and minimal/none) */}
         {isNonGridLayout && !isHeroHeader && !isMinimalHeader && !isNoHeader && (
           <div className="bg-surface border-b border-surface">
@@ -432,16 +435,16 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
 
         {/* For hero header style - minimal header with just menu and logout */}
         {isHeroHeader && (
-          <div className="container py-3">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
             <div className="flex items-center justify-between">
               {/* Left side - Menu button */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 sm:gap-3 bg-black/30 backdrop-blur-sm rounded-full px-1 py-1 sm:px-2 sm:py-2">
                 {menuButton}
                 {headerExtra}
               </div>
 
               {/* Right side - Action buttons */}
-              <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="flex items-center gap-3 flex-shrink-0 bg-black/30 backdrop-blur-sm rounded-full px-2 py-2">
                 {/* Download all button */}
                 {showDownloadAll && onDownloadAll && (
                   <Button
@@ -561,7 +564,7 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
       )}
 
       {/* Main Content */}
-      <main className="container">{children}</main>
+      <main className="w-full px-4 sm:px-6 lg:px-8">{children}</main>
 
       {/* Footer */}
       <footer className="gallery-footer mt-8 sm:mt-12 py-6 sm:py-8 border-t border-surface">

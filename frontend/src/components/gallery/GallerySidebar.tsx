@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { X, Download, Filter, SortAsc, Search, Calendar, Type, HardDrive, Check, Star, Upload, Camera } from 'lucide-react';
+import { X, Download, Filter, SortAsc, Search, Calendar, Type, HardDrive, Check, Star, Upload, Camera, LogOut } from 'lucide-react';
 import { Button } from '../common';
 import { PhotoCategory } from '../../types';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +37,8 @@ interface GallerySidebarProps {
   mediaFilter?: 'all' | 'photo' | 'video';
   onMediaFilterChange?: (filter: 'all' | 'photo' | 'video') => void;
   showMediaFilter?: boolean;
+  showLogout?: boolean;
+  onLogout?: () => void;
 }
 
 export const GallerySidebar: React.FC<GallerySidebarProps> = ({
@@ -70,7 +72,9 @@ export const GallerySidebar: React.FC<GallerySidebarProps> = ({
   ratedCount = 0,
   mediaFilter = 'all',
   onMediaFilterChange,
-  showMediaFilter = false
+  showMediaFilter = false,
+  showLogout = false,
+  onLogout
 }) => {
   const { t } = useTranslation();
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -374,6 +378,22 @@ export const GallerySidebar: React.FC<GallerySidebarProps> = ({
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Logout */}
+          {showLogout && onLogout && (
+            <div className="gallery-sidebar-section p-4 border-t border-surface">
+              <button
+                onClick={() => {
+                  onLogout();
+                  if (isMobile) onClose();
+                }}
+                className="gallery-btn w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-3 hover:bg-black/10 text-muted-theme"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>{t('common.logout')}</span>
+              </button>
             </div>
           )}
         </div>

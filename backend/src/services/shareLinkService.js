@@ -98,6 +98,14 @@ const buildShareLinkVariants = async ({ slug, shareToken }) => {
   };
 };
 
+const toFullShareUrl = (sharePath) => {
+  if (!sharePath || /^https?:\/\//i.test(sharePath)) {
+    return sharePath;
+  }
+  const frontendBase = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+  return frontendBase ? `${frontendBase}${sharePath}` : sharePath;
+};
+
 const getEventShareToken = (event) => {
   if (!event) {
     return null;
@@ -177,5 +185,6 @@ module.exports = {
   clearShareLinkSettingsCache,
   buildShareLinkVariants,
   getEventShareToken,
-  resolveShareIdentifier
+  resolveShareIdentifier,
+  toFullShareUrl
 };

@@ -7,6 +7,7 @@ const watermarkService = require('../services/watermarkService');
 const secureImageService = require('../services/secureImageService');
 const { getStoragePath } = require('../config/storage');
 const crypto = require('crypto');
+const { timingSafeEqualStr } = require('../utils/timingSafe');
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ function verifyImageToken(token) {
     
     // Verify signature
     const expectedSignature = crypto.createHmac('sha256', secret).update(decoded).digest('hex');
-    if (signature !== expectedSignature) {
+    if (!timingSafeEqualStr(signature, expectedSignature)) {
       return null;
     }
     

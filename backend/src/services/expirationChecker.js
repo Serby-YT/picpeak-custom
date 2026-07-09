@@ -5,6 +5,7 @@ const { queueEmail } = require('./emailProcessor');
 const logger = require('../utils/logger');
 const { formatDate } = require('../utils/dateFormatter');
 const { formatBoolean } = require('../utils/dbCompat');
+const { toFullShareUrl } = require('./shareLinkService');
 
 function startExpirationChecker() {
   // Check every hour for expired events and warnings
@@ -74,7 +75,7 @@ async function queueExpirationWarning(event) {
     event_name: event.event_name,
     days_remaining: daysRemaining.toString(),
     expiration_date: await formatDate(event.expires_at, emailLang),
-    gallery_link: event.share_link
+    gallery_link: toFullShareUrl(event.share_link)
   });
   
   logger.info(`Queued expiration warning for event ${event.slug}`);

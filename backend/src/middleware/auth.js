@@ -18,6 +18,7 @@ async function adminAuth(req, res, next) {
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        algorithms: ['HS256'],
         issuer: 'picpeak-auth',
         complete: true
       });
@@ -134,6 +135,7 @@ async function galleryAuth(req, res, next) {
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        algorithms: ['HS256'],
         issuer: 'picpeak-auth',
         complete: true
       });
@@ -203,7 +205,7 @@ async function photoAuth(req, res, next) {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     } catch (err) {
       return res.status(401).json({ error: 'Invalid token' });
     }

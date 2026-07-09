@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, Calendar, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedDate } from '../../hooks/useLocalizedDate';
@@ -29,6 +29,8 @@ interface HeroHeaderProps {
   onScrollToContent?: () => void;
   // Hero image anchor position (#162) – keyword or "X% Y%" focal point
   heroImageAnchor?: string;
+  // Photographer/studio name credit shown bottom-center of the hero
+  photographerName?: string;
 }
 
 export const HeroHeader: React.FC<HeroHeaderProps> = ({
@@ -39,16 +41,13 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
   eventDate,
   expiresAt,
   heroPhotoOverride,
-  heroLogoVisible = true,
-  heroLogoSize = 'medium',
-  heroLogoPosition = 'top',
   dividerStyle = 'wave',
   allowDownloads = true,
   protectionLevel = 'standard',
   useEnhancedProtection = false,
   useCanvasRendering = false,
-  onScrollToContent,
-  heroImageAnchor = 'center'
+  heroImageAnchor = 'center',
+  photographerName
 }) => {
   const { t } = useTranslation();
   const { format } = useLocalizedDate();
@@ -57,38 +56,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
   const [hasInitialized, setHasInitialized] = useState(false);
 
   const gallerySettings = theme.gallerySettings || {};
-  const overlayOpacity = gallerySettings.heroOverlayOpacity || 0.3;
-
-  // Helper function to get logo size classes
-  const getLogoSizeClasses = (size: string): string => {
-    switch (size) {
-      case 'small':
-        return 'h-12 sm:h-14 lg:h-16';
-      case 'medium':
-        return 'h-20 sm:h-24 lg:h-32';
-      case 'large':
-        return 'h-28 sm:h-32 lg:h-40';
-      case 'xlarge':
-        return 'h-36 sm:h-40 lg:h-48';
-      default:
-        return 'h-20 sm:h-24 lg:h-32';
-    }
-  };
-
-  const handleScrollToContent = useCallback(() => {
-    if (onScrollToContent) {
-      onScrollToContent();
-    } else {
-      // Default: scroll to gallery grid section
-      const gridSection = document.getElementById('gallery-grid-section');
-      if (gridSection) {
-        gridSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        // Fallback: scroll down by hero section height
-        window.scrollBy({ top: window.innerHeight * 0.9, behavior: 'smooth' });
-      }
-    }
-  }, [onScrollToContent]);
+  const overlayOpacity = gallerySettings.heroOverlayOpacity || 0.2;
 
   // If an override is provided, always use it and skip initialization logic
   useEffect(() => {
@@ -133,9 +101,9 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
   if (!heroPhoto) return null;
 
   return (
-    <div className="relative -mt-6">
+    <div className="relative">
       {/* Hero Section */}
-      <div className="relative h-[60vh] sm:h-[70vh] lg:h-[80vh] max-h-[700px] -mx-4 sm:-mx-6 lg:-mx-8 mb-8">
+      <div className="relative left-1/2 -translate-x-1/2 w-screen aspect-video sm:aspect-auto sm:h-screen mb-8">
         <AuthenticatedImage
           src={heroPhoto.hero_url || heroPhoto.url}
           fallbackSrc={heroPhoto.url}
@@ -159,99 +127,42 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
 
         {/* Hero Content */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center px-4">
-            {/* Logo at top position */}
-            {heroLogoVisible && heroLogoPosition === 'top' && (
-              <div className="mb-6">
-                <img
-                  src={eventLogo ?
-                    buildResourceUrl(eventLogo) :
-                    '/picpeak-logo-transparent.png'
-                  }
-                  alt="Event logo"
-                  className={`${getLogoSizeClasses(heroLogoSize)} mx-auto`}
-                  style={{
-                    filter: eventLogo
-                      ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5))'
-                      : 'brightness(0) invert(1) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5))'
-                  }}
-                />
-              </div>
-            )}
-
+          <div className="text-center px-4 sm:px-10 lg:px-14">
             {/* Event Title */}
             {eventName && (
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white drop-shadow-lg mb-4">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl xl:text-6xl font-semibold text-white drop-shadow-lg mb-2 sm:mb-3">
                 {eventName}
               </h1>
             )}
 
-            {/* Logo at center position (between title and dates) */}
-            {heroLogoVisible && heroLogoPosition === 'center' && (
-              <div className="my-6">
-                <img
-                  src={eventLogo ?
-                    buildResourceUrl(eventLogo) :
-                    '/picpeak-logo-transparent.png'
-                  }
-                  alt="Event logo"
-                  className={`${getLogoSizeClasses(heroLogoSize)} mx-auto`}
-                  style={{
-                    filter: eventLogo
-                      ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5))'
-                      : 'brightness(0) invert(1) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5))'
-                  }}
-                />
-              </div>
-            )}
-
             {/* Event Dates */}
             {(eventDate || expiresAt) && (
-              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-white/90">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-6 text-white/90">
                 {eventDate && (
-                  <span className="flex items-center text-lg sm:text-xl">
-                    <Calendar className="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
+                  <span className="flex items-center text-xs sm:text-xl">
+                    <Calendar className="w-3.5 h-3.5 sm:w-6 sm:h-6 mr-1.5 sm:mr-2" />
                     {format(parseISO(eventDate), 'PP')}
                   </span>
                 )}
                 {expiresAt && (
-                  <span className="flex items-center text-lg sm:text-xl">
-                    <Clock className="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
+                  <span className="flex items-center text-xs sm:text-xl">
+                    <Clock className="w-3.5 h-3.5 sm:w-6 sm:h-6 mr-1.5 sm:mr-2" />
                     {t('gallery.expires')} {format(parseISO(expiresAt), 'PP')}
                   </span>
                 )}
               </div>
             )}
-
-            {/* Logo at bottom position */}
-            {heroLogoVisible && heroLogoPosition === 'bottom' && (
-              <div className="mt-6">
-                <img
-                  src={eventLogo ?
-                    buildResourceUrl(eventLogo) :
-                    '/picpeak-logo-transparent.png'
-                  }
-                  alt="Event logo"
-                  className={`${getLogoSizeClasses(heroLogoSize)} mx-auto`}
-                  style={{
-                    filter: eventLogo
-                      ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5))'
-                      : 'brightness(0) invert(1) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5))'
-                  }}
-                />
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Scroll Indicator */}
-        <button
-          onClick={handleScrollToContent}
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce cursor-pointer hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 rounded-full p-2"
-          aria-label="Scroll to gallery"
-        >
-          <ChevronDown className="w-8 h-8 text-white drop-shadow-lg" />
-        </button>
+        {/* Photographer Credit */}
+        {photographerName && (
+          <div className="absolute bottom-3 sm:bottom-5 inset-x-0 flex justify-center">
+            <span className="text-white/80 text-xs sm:text-sm drop-shadow-lg">
+              {photographerName}
+            </span>
+          </div>
+        )}
 
         {/* Decorative Divider */}
         <HeroDivider style={dividerStyle} />

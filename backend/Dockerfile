@@ -31,7 +31,7 @@ WORKDIR /app
 RUN apk upgrade --no-cache
 
 # Upgrade npm to latest to fix tar, minimatch, brace-expansion CVEs in npm's own deps
-RUN npm install -g npm@latest
+RUN npm install -g npm@10
 
 # Install dumb-init for proper signal handling and postgresql-client for database checks
 RUN apk add --no-cache dumb-init postgresql-client

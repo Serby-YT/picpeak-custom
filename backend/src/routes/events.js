@@ -9,7 +9,7 @@ const { adminAuth } = require('../middleware/auth');
 const fs = require('fs').promises;
 const path = require('path');
 const router = express.Router();
-const { buildShareLinkVariants } = require('../services/shareLinkService');
+const { buildShareLinkVariants, toFullShareUrl } = require('../services/shareLinkService');
 const { parseBooleanInput, parseStringInput } = require('../utils/parsers');
 const eventTypeService = require('../services/eventTypeService');
 
@@ -32,6 +32,7 @@ const mapEventForApi = (event) => {
 
   return {
     ...rest,
+    share_link: toFullShareUrl(rest.share_link),
     customer_name: customer_name ?? host_name ?? null,
     customer_email: customer_email ?? host_email ?? null
   };

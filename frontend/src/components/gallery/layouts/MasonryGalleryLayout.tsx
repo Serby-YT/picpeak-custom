@@ -73,7 +73,7 @@ const MasonryPhoto: React.FC<MasonryPhotoProps> = ({
 
   return (
     <div
-      className="photo-card relative group cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+      className="photo-card relative group cursor-pointer"
       onClick={onClick}
       style={{
         ...style,
@@ -84,7 +84,7 @@ const MasonryPhoto: React.FC<MasonryPhotoProps> = ({
       <AuthenticatedImage
         src={photo.thumbnail_url || photo.url}
         alt={photo.filename}
-        className="w-full h-full object-cover rounded-lg"
+        className="w-full h-full object-cover"
         loading="lazy"
         isGallery={true}
         protectFromDownload={!allowDownloads}
@@ -114,41 +114,41 @@ const MasonryPhoto: React.FC<MasonryPhotoProps> = ({
         </div>
       )}
       
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center gap-2">
+      <div className="absolute bottom-2 right-2 z-10 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         {!isSelectionMode && (
           <>
             <button
-              className="p-2 bg-white/90 rounded-full hover:bg-white transition-colors"
+              className="p-1.5 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black/70 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 onClick(e);
               }}
               aria-label="View full size"
             >
-              <Maximize2 className="w-5 h-5 text-neutral-800" />
+              <Maximize2 className="w-4 h-4 text-white" />
             </button>
             {allowDownloads && (
               <button
-                className="p-2 bg-white/90 rounded-full hover:bg-white transition-colors"
+                className="p-1.5 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black/70 transition-colors"
                 onClick={onDownload}
                 aria-label="Download photo"
               >
-                <Download className="w-5 h-5 text-neutral-800" />
+                <Download className="w-4 h-4 text-white" />
               </button>
             )}
             {feedbackEnabled && feedbackOptions?.allowComments && onQuickComment && (
               <button
-                className="p-2 bg-white/90 rounded-full hover:bg-white transition-colors"
+                className="p-1.5 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black/70 transition-colors"
                 onClick={(e) => { e.stopPropagation(); onQuickComment(); }}
                 aria-label="Comment on photo"
                 title="Comment"
               >
-                <MessageSquare className="w-5 h-5 text-neutral-800" />
+                <MessageSquare className="w-4 h-4 text-white" />
               </button>
             )}
             {feedbackEnabled && feedbackOptions?.allowLikes && (
               <button
-                className="p-2 bg-white/90 rounded-full hover:bg-white transition-colors"
+                className="p-1.5 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black/70 transition-colors"
                 onClick={async (e) => {
                   e.stopPropagation();
                   if (feedbackOptions?.requireNameEmail && !savedIdentity) {
@@ -165,7 +165,7 @@ const MasonryPhoto: React.FC<MasonryPhotoProps> = ({
                 aria-label="Like photo"
                 title="Like"
               >
-                <Heart className="w-5 h-5 text-neutral-800" />
+                <Heart className="w-4 h-4 text-white" />
               </button>
             )}
           </>
@@ -250,9 +250,9 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
         const width = containerRef.current.offsetWidth;
         setContainerWidth(width);
         if (width < 640) setColumns(2);
-        else if (width < 1024) setColumns(3);
-        else if (width < 1280) setColumns(4);
-        else setColumns(5);
+        else if (width < 1024) setColumns(2);
+        else if (width < 1280) setColumns(3);
+        else setColumns(4);
       }
     };
 
@@ -265,9 +265,9 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
           setContainerWidth(entry.contentRect.width);
           const width = entry.contentRect.width;
           if (width < 640) setColumns(2);
-          else if (width < 1024) setColumns(3);
-          else if (width < 1280) setColumns(4);
-          else setColumns(5);
+          else if (width < 1024) setColumns(2);
+          else if (width < 1280) setColumns(3);
+          else setColumns(4);
         }
       }
     });
@@ -401,7 +401,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
           // Render a simple grid while calculating to get container width
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {photos.slice(0, 8).map((photo) => (
-              <div key={photo.id} className="aspect-square bg-neutral-200 rounded-lg animate-pulse" />
+              <div key={photo.id} className="aspect-square bg-neutral-200  animate-pulse" />
             ))}
           </div>
         ) : photos.map((photo, index) => {
@@ -423,7 +423,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
               <AuthenticatedImage
                 src={photo.thumbnail_url || photo.url}
                 alt={photo.filename}
-                className="w-full h-full object-cover rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
+                className="w-full h-full object-cover  transition-transform duration-300 group-hover:scale-[1.02]"
                 loading="lazy"
                 isGallery={true}
                 protectFromDownload={!allowDownloads}
@@ -454,7 +454,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
               )}
 
               {/* Hover overlay with actions */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center gap-2">
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200  flex items-center justify-center gap-2">
                 {!isSelectionMode && (
                   <>
                     <button
@@ -517,7 +517,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
         {isCalculating ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {photos.slice(0, 8).map((photo) => (
-              <div key={photo.id} className="aspect-square bg-neutral-200 rounded-lg animate-pulse" />
+              <div key={photo.id} className="aspect-square bg-neutral-200  animate-pulse" />
             ))}
           </div>
         ) : photos.map((photo, index) => {
@@ -539,7 +539,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
               <AuthenticatedImage
                 src={photo.thumbnail_url || photo.url}
                 alt={photo.filename}
-                className="w-full h-full object-cover rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
+                className="w-full h-full object-cover  transition-transform duration-300 group-hover:scale-[1.02]"
                 loading="lazy"
                 isGallery={true}
                 protectFromDownload={!allowDownloads}
@@ -570,7 +570,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
               )}
 
               {/* Hover overlay with actions */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center gap-2">
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200  flex items-center justify-center gap-2">
                 {!isSelectionMode && (
                   <>
                     <button
@@ -658,7 +658,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
           return (
             <div
               key={photo.id}
-              className={`photo-card group cursor-pointer relative overflow-hidden rounded-lg bg-neutral-100 ${spanClasses}`}
+              className={`photo-card group cursor-pointer relative overflow-hidden  bg-neutral-100 ${spanClasses}`}
               onClick={() => onPhotoClick(index)}
             >
               <AuthenticatedImage

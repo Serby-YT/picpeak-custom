@@ -16,7 +16,7 @@ const { escapeLikePattern } = require('../utils/sqlSecurity');
 // formatDate import removed - dates are formatted by email processor
 const { validatePasswordInContext, getBcryptRounds } = require('../utils/passwordValidation');
 const logger = require('../utils/logger');
-const { buildShareLinkVariants } = require('../services/shareLinkService');
+const { buildShareLinkVariants, toFullShareUrl } = require('../services/shareLinkService');
 const { parseBooleanInput, parseStringInput } = require('../utils/parsers');
 const eventTypeService = require('../services/eventTypeService');
 const { validateFileType } = require('../utils/fileSecurityUtils');
@@ -129,6 +129,7 @@ const mapEventForApi = (event) => {
 
   return {
     ...rest,
+    share_link: toFullShareUrl(rest.share_link),
     customer_name: customer_name ?? host_name ?? null,
     customer_email: customer_email ?? host_email ?? null
   };
@@ -1054,7 +1055,7 @@ router.post('/:id/reset-password', adminAuth, requirePermission('events.edit'), 
         host_name: recipientName,
         event_name: event.event_name,
         event_date: event.event_date,  // Pass raw date - will be formatted by email processor
-        gallery_link: event.share_link,
+        gallery_link: toFullShareUrl(event.share_link),
         gallery_password: newPassword,
         expiry_date: event.expires_at  // Pass raw date - will be formatted by email processor
       });
@@ -1119,7 +1120,7 @@ router.post('/:id/resend-email', adminAuth, requirePermission('events.edit'), as
       host_name: recipientName,
       event_name: event.event_name,
       event_date: event.event_date,  // Pass raw date - will be formatted by email processor
-      gallery_link: event.share_link,
+      gallery_link: toFullShareUrl(event.share_link),
       gallery_password: galleryPassword,
       expiry_date: event.expires_at,  // Pass raw date - will be formatted by email processor
       welcome_message: event.welcome_message || '',

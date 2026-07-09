@@ -37,9 +37,11 @@ services:
       retries: 5
 
   backend:
-    # Use pre-built image from GitHub Container Registry
-    # PICPEAK_CHANNEL: 'stable' (default), 'beta', or specific version like 'v2.3.0'
-    image: ghcr.io/the-luap/picpeak/backend:${PICPEAK_CHANNEL:-stable}
+    # Built locally from ./backend — all bug fixes and hardening are baked
+    # directly into the source (see git history), no runtime file overlays.
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: picpeak-backend
     env_file: .env
     environment:
@@ -48,7 +50,6 @@ services:
       - REDIS_HOST=redis
       - STORAGE_PATH=/app/storage
       - PHOTOS_DIR=/app/storage/events
-      - PICPEAK_RELEASE_CHANNEL=${PICPEAK_CHANNEL:-stable}
     volumes:
       - ${APP_STORAGE}:/app/storage
       - ${LOGS}:/app/logs
@@ -64,16 +65,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      # Backend exposes /health on internal port 3000
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      # Backend exposes /health on internal port 3000 (curl not present in image, use wget)
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
   frontend:
-    # Use pre-built image from GitHub Container Registry
-    # Uses same channel as backend for consistency
-    image: ghcr.io/the-luap/picpeak/frontend:${PICPEAK_CHANNEL:-stable}
+    # Built locally from ./frontend so source bug-fix patches (hero image, etc.) take effect.
+    # To go back to the pre-built registry image, restore:
+    # image: ghcr.io/the-luap/picpeak/frontend:${PICPEAK_CHANNEL:-stable}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: picpeak-frontend
     # Note: Pre-built frontend uses Nginx to proxy /api to backend:3001.
     # Prefer keeping API base as '/api' in builds to avoid CORS.

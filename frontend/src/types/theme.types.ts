@@ -320,18 +320,20 @@ export const GALLERY_THEME_PRESETS: Record<string, EventTheme> = {
       surfaceBorderColor: '#262626',
       mutedTextColor: '#a3a3a3',
       colorMode: 'dark',
-      fontFamily: 'Inter, sans-serif',
+      fontFamily: "'Poppins', sans-serif",
+      headingFontFamily: "'Poppins', sans-serif",
       borderRadius: 'sm',
       galleryLayout: 'masonry',
       gallerySettings: {
         spacing: 'tight',
         photoAnimation: 'fade',
         masonryMode: 'columns',
-        masonryGutter: 16
+        masonryGutter: 8
       },
-      headerStyle: 'minimal',
+      headerStyle: 'hero',
       footerStyle: 'minimal',
-      shadowStyle: 'normal'
+      shadowStyle: 'normal',
+      customCss: '.gallery-page, .gallery-page * { text-transform: uppercase; letter-spacing: 0.01em; } @media (max-width: 640px) { .gallery-page, .gallery-page * { letter-spacing: 0; } }'
     },
     isPreset: true
   },
