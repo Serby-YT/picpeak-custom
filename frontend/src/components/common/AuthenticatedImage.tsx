@@ -10,6 +10,10 @@ import {
 interface AuthenticatedImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'onLoad'> {
   src: string;
   fallbackSrc?: string;
+  // Shown blurred, filling the frame, while the real image loads — e.g. pass
+  // the already-cached grid thumbnail so a lightbox view has something to
+  // show instantly instead of a blank/gray box.
+  placeholderSrc?: string;
   useWatermark?: boolean;
   isGallery?: boolean;
   protectFromDownload?: boolean;
@@ -35,6 +39,7 @@ interface AuthenticatedImageProps extends Omit<React.ImgHTMLAttributes<HTMLImage
 export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   src,
   fallbackSrc,
+  placeholderSrc,
   alt,
   useWatermark = false,
   isGallery = false,
@@ -241,8 +246,26 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   }, [imageSrc, useCanvasRendering, drawToCanvas, onLoad]);
 
   if (isLoading) {
+    if (placeholderSrc) {
+      // The caller's own style may gate opacity on ITS OWN load state (e.g.
+      // the lightbox fades the real image in from 0 once loaded) — that
+      // doesn't apply to this placeholder, which should stay visible for
+      // the whole loading phase, so opacity is deliberately not inherited.
+      const { opacity: _callerOpacity, ...restStyle } = (props.style || {}) as React.CSSProperties;
+      return (
+        <div className={props.className} style={{ overflow: 'hidden', ...restStyle, opacity: 1 }}>
+          <img
+            src={placeholderSrc}
+            alt=""
+            aria-hidden="true"
+            className="w-full h-full object-cover"
+            style={{ filter: 'blur(16px)', transform: 'scale(1.1)' }}
+          />
+        </div>
+      );
+    }
     return (
-      <div className={props.className} style={{ backgroundColor: '#f3f4f6', ...props.style }}>
+      <div className={props.className} style={{ backgroundColor: 'var(--color-surface, #f3f4f6)', ...props.style }}>
         {/* Show a placeholder while loading */}
       </div>
     );

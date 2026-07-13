@@ -99,10 +99,10 @@ export const CreateEventPage: React.FC = () => {
     upload_category_id: null,
     css_template_id: null,
     feedback_settings: {
-      feedback_enabled: false,
+      feedback_enabled: true,
       allow_ratings: true,
       allow_likes: true,
-      allow_comments: true,
+      allow_comments: false,
       allow_favorites: true,
       require_name_email: false,
       moderate_comments: true,

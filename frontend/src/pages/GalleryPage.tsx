@@ -252,7 +252,7 @@ export const GalleryPage: React.FC = () => {
   // Show loading state
   if (isLoadingInfo) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background, #fafafa)' }}>
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="min-h-screen flex items-center justify-center">
           <Loading size="lg" text={t('gallery.loading')} />
         </div>
@@ -262,7 +262,7 @@ export const GalleryPage: React.FC = () => {
 
   if (identifierError && !resolvedSlug && !isResolvingIdentifier) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background, #fafafa)' }}>
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="min-h-screen flex flex-col">
           {settingsData?.branding_logo_url && (
             <div className="p-8 text-center">
@@ -275,13 +275,13 @@ export const GalleryPage: React.FC = () => {
           )}
 
           <div className="flex-1 flex items-center justify-center">
-            <Card className="max-w-md w-full mx-4">
+            <Card className="max-w-md w-full mx-4 card-themed">
               <CardContent className="text-center py-12">
                 <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">
+                <h2 className="text-xl font-semibold mb-2 text-theme">
                   {t('errors.galleryNotFound')}
                 </h2>
-                <p className="text-neutral-600">
+                <p className="text-muted-theme">
                   {identifierError}
                 </p>
               </CardContent>
@@ -292,19 +292,19 @@ export const GalleryPage: React.FC = () => {
             <div className="flex items-center justify-center gap-4">
               <Link
                 to="/impressum"
-                className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="text-xs text-muted-theme hover:text-theme transition-colors"
               >
                 {t('legal.impressum')}
               </Link>
-              <span className="text-xs text-neutral-400">|</span>
+              <span className="text-xs text-muted-theme">|</span>
               <Link
                 to="/datenschutz"
-                className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="text-xs text-muted-theme hover:text-theme transition-colors"
               >
                 {t('legal.datenschutz')}
               </Link>
             </div>
-            <p className="text-xs mt-2 text-neutral-500">
+            <p className="text-xs mt-2 text-muted-theme">
               Powered by <span className="font-semibold">PicPeak</span>
             </p>
           </div>
@@ -320,7 +320,7 @@ export const GalleryPage: React.FC = () => {
     const isArchived = errorMessage?.includes('archived');
     
     return (
-      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background, #fafafa)' }}>
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="min-h-screen flex flex-col">
           {/* Logo at top */}
           {settingsData?.branding_logo_url && (
@@ -334,13 +334,13 @@ export const GalleryPage: React.FC = () => {
           )}
           
           <div className="flex-1 flex items-center justify-center">
-            <Card className="max-w-md w-full mx-4">
+            <Card className="max-w-md w-full mx-4 card-themed">
               <CardContent className="text-center py-12">
                 <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">
+                <h2 className="text-xl font-semibold mb-2 text-theme">
                   {t(isArchived ? 'errors.galleryArchived' : 'errors.galleryNotFound')}
                 </h2>
-                <p className="text-neutral-600">
+                <p className="text-muted-theme">
                   {t(isArchived ? 'errors.galleryArchivedMessage' : 'errors.galleryNotFoundMessage')}
                 </p>
               </CardContent>
@@ -352,19 +352,19 @@ export const GalleryPage: React.FC = () => {
             <div className="flex items-center justify-center gap-4">
               <Link 
                 to="/impressum" 
-                className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="text-xs text-muted-theme hover:text-theme transition-colors"
               >
                 {t('legal.impressum')}
               </Link>
-              <span className="text-xs text-neutral-400">|</span>
+              <span className="text-xs text-muted-theme">|</span>
               <Link 
                 to="/datenschutz" 
-                className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="text-xs text-muted-theme hover:text-theme transition-colors"
               >
                 {t('legal.datenschutz')}
               </Link>
             </div>
-            <p className="text-xs mt-2 text-neutral-500">
+            <p className="text-xs mt-2 text-muted-theme">
               Powered by <span className="font-semibold">PicPeak</span>
             </p>
           </div>
@@ -376,7 +376,7 @@ export const GalleryPage: React.FC = () => {
   // Show expired state
   if (galleryInfo?.is_expired) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background, #fafafa)' }}>
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="min-h-screen flex flex-col">
           {/* Logo at top */}
           {settingsData?.branding_logo_url && (
@@ -390,16 +390,16 @@ export const GalleryPage: React.FC = () => {
           )}
           
           <div className="flex-1 flex items-center justify-center">
-            <Card className="max-w-md w-full mx-4">
+            <Card className="max-w-md w-full mx-4 card-themed">
               <CardContent className="text-center py-12">
                 <Clock className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">{t('gallery.expired')}</h2>
+                <h2 className="text-xl font-semibold mb-2 text-theme">{t('gallery.expired')}</h2>
                 {galleryInfo.expires_at && (
-                  <p className="text-neutral-600 mb-4">
+                  <p className="text-muted-theme mb-4">
                     {t('gallery.expiredOn', { date: format(parseISO(galleryInfo.expires_at), 'PP') })}
                   </p>
                 )}
-                <p className="text-sm text-neutral-500">
+                <p className="text-sm text-muted-theme">
                   {t('gallery.contactOrganizer')}
                 </p>
               </CardContent>
@@ -411,19 +411,19 @@ export const GalleryPage: React.FC = () => {
             <div className="flex items-center justify-center gap-4">
               <Link 
                 to="/impressum" 
-                className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="text-xs text-muted-theme hover:text-theme transition-colors"
               >
                 {t('legal.impressum')}
               </Link>
-              <span className="text-xs text-neutral-400">|</span>
+              <span className="text-xs text-muted-theme">|</span>
               <Link 
                 to="/datenschutz" 
-                className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="text-xs text-muted-theme hover:text-theme transition-colors"
               >
                 {t('legal.datenschutz')}
               </Link>
             </div>
-            <p className="text-xs mt-2 text-neutral-500">
+            <p className="text-xs mt-2 text-muted-theme">
               Powered by <span className="font-semibold">PicPeak</span>
             </p>
           </div>
@@ -441,7 +441,7 @@ export const GalleryPage: React.FC = () => {
 
   // Show login form
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background, #fafafa)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-lg">
           {/* Logo/Header */}
@@ -454,21 +454,21 @@ export const GalleryPage: React.FC = () => {
               alt={settingsData?.branding_company_name || 'PicPeak'}
               className="h-12 sm:h-16 lg:h-20 w-auto object-contain mx-auto mb-3 sm:mb-4"
             />
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 px-2" style={{ color: 'var(--color-primary, #5C8762)' }}>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 px-2" style={{ color: 'var(--color-primary)' }}>
               {galleryInfo?.event_name}
             </h1>
           </div>
 
           {/* Expiration Warning */}
           {daysUntilExpiration !== null && daysUntilExpiration <= 7 && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
               <div className="flex items-start">
-                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 mt-0.5 mr-2 flex-shrink-0" />
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-amber-800">
+                  <p className="text-xs sm:text-sm font-medium text-amber-500">
                     {t('gallery.expiresIn', { count: daysUntilExpiration })}
                   </p>
-                  <p className="text-xs text-amber-700 mt-1">
+                  <p className="text-xs text-amber-500/80 mt-1">
                     {t('gallery.downloadBefore')}
                   </p>
                 </div>
@@ -476,12 +476,12 @@ export const GalleryPage: React.FC = () => {
             </div>
           )}
 
-          <Card>
+          <Card className="card-themed">
             <CardContent className="p-4 sm:p-6">
               {requiresPassword ? (
                 <>
-                  <h2 className="text-base sm:text-lg lg:text-xl font-semibold mb-4">{t('auth.enterPassword')}</h2>
-                  
+                  <h2 className="text-base sm:text-lg lg:text-xl font-semibold mb-4 text-theme">{t('auth.enterPassword')}</h2>
+
                   <form onSubmit={handleLogin} className="space-y-4">
                     <Input
                       type="password"
@@ -491,7 +491,7 @@ export const GalleryPage: React.FC = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       error={loginError || undefined}
                       autoFocus
-                      className="text-sm sm:text-base"
+                      className="text-sm sm:text-base input-themed"
                     />
                     
                     <ReCaptcha
@@ -511,16 +511,16 @@ export const GalleryPage: React.FC = () => {
                     </Button>
                   </form>
 
-                  <p className="text-xs text-neutral-500 text-center mt-4 sm:mt-6">
+                  <p className="text-xs text-muted-theme text-center mt-4 sm:mt-6">
                     {t('auth.passwordHint')}
                   </p>
                 </>
               ) : (
                 <div className="text-center space-y-3">
-                  <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
+                  <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-theme">
                     {t('gallery.publicGalleryTitle', 'This gallery is publicly accessible')}
                   </h2>
-                  <p className="text-sm text-neutral-600">
+                  <p className="text-sm text-muted-theme">
                     {t('gallery.publicGallerySubtitle', 'Loading the photos now...')}
                   </p>
                   <div className="flex justify-center py-4">
@@ -539,19 +539,19 @@ export const GalleryPage: React.FC = () => {
             <div className="flex items-center justify-center gap-4">
               <Link 
                 to="/impressum" 
-                className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="text-xs text-muted-theme hover:text-theme transition-colors"
               >
                 {t('legal.impressum')}
               </Link>
-              <span className="text-xs text-neutral-400">|</span>
+              <span className="text-xs text-muted-theme">|</span>
               <Link 
                 to="/datenschutz" 
-                className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                className="text-xs text-muted-theme hover:text-theme transition-colors"
               >
                 {t('legal.datenschutz')}
               </Link>
             </div>
-            <p className="text-xs mt-2 text-neutral-500">
+            <p className="text-xs mt-2 text-muted-theme">
               Powered by <span className="font-semibold">PicPeak</span>
             </p>
           </div>

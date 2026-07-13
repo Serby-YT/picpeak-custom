@@ -16,6 +16,7 @@ export { AdminPhotoGrid } from './AdminPhotoGrid';
 export { AdminPhotoViewer } from './AdminPhotoViewer';
 export { PhotoFilters } from './PhotoFilters';
 export { PasswordResetModal } from './PasswordResetModal';
+export { GalleryQRCodeModal } from './GalleryQRCodeModal';
 export { AdminAuthenticatedImage } from './AdminAuthenticatedImage';
 export { AdminAuthenticatedVideo } from './AdminAuthenticatedVideo';
 export { ThemeCustomizerEnhanced } from './ThemeCustomizerEnhanced';

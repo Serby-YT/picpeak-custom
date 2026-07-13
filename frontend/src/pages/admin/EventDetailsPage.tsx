@@ -27,7 +27,8 @@ import {
   Droplets,
   MousePointer,
   Layout,
-  Trash2
+  Trash2,
+  QrCode
 } from 'lucide-react';
 import { parseISO, differenceInDays, isValid } from 'date-fns';
 
@@ -52,7 +53,7 @@ import { toast } from 'react-toastify';
 import { useLocalizedDate } from '../../hooks/useLocalizedDate';
 
 import { Button, Input, Card, Loading } from '../../components/common';
-import { EventCategoryManager, AdminPhotoGrid, AdminPhotoViewer, PhotoFilters, PasswordResetModal, ThemeCustomizerEnhanced, ThemeDisplay, HeroPhotoSelector, FocalPointPicker, PhotoUploadModal, FeedbackSettings, FeedbackModerationPanel, EventRenameDialog, PhotoFilterPanel, PhotoExportMenu } from '../../components/admin';
+import { EventCategoryManager, AdminPhotoGrid, AdminPhotoViewer, PhotoFilters, PasswordResetModal, ThemeCustomizerEnhanced, ThemeDisplay, HeroPhotoSelector, FocalPointPicker, PhotoUploadModal, FeedbackSettings, FeedbackModerationPanel, EventRenameDialog, PhotoFilterPanel, PhotoExportMenu, GalleryQRCodeModal } from '../../components/admin';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventsService } from '../../services/events.service';
 import { publicSettingsService } from '../../services/publicSettings.service';
@@ -224,6 +225,7 @@ export const EventDetailsPage: React.FC = () => {
   const [importing, setImporting] = useState<boolean>(false);
   const [selectedPhoto, setSelectedPhoto] = useState<{ photo: AdminPhoto; index: number } | null>(null);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -1467,6 +1469,14 @@ export const EventDetailsPage: React.FC = () => {
               >
                 {copiedLink ? t('events.copied') : t('events.copy')}
               </Button>
+              <Button
+                variant="outline"
+                size="md"
+                leftIcon={<QrCode className="w-4 h-4" />}
+                onClick={() => setShowQRCode(true)}
+              >
+                QR Code
+              </Button>
             </div>
 
             <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-2">
@@ -1826,6 +1836,15 @@ export const EventDetailsPage: React.FC = () => {
             return result;
           }}
           onClose={() => setShowPasswordReset(false)}
+        />
+      )}
+
+      {/* QR Code Modal */}
+      {showQRCode && (
+        <GalleryQRCodeModal
+          eventName={event.event_name}
+          url={resolveShareLink(event.share_link)}
+          onClose={() => setShowQRCode(false)}
         />
       )}
 
