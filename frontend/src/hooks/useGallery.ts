@@ -68,8 +68,16 @@ export const useDownloadPhoto = () => {
 export const useDownloadAllPhotos = () => {
   return useMutation({
     mutationFn: (slug: string) => galleryService.downloadAllPhotos(slug),
+    onMutate: () => {
+      // The zip is generated and streamed live, then fetched in full before
+      // the browser can save it — large galleries can take several minutes
+      // with no visible progress in between, so set expectations up front.
+      toast.info('Preparing your download — large galleries can take several minutes. Please keep this tab open.', {
+        autoClose: 8000,
+      });
+    },
     onSuccess: () => {
-      toast.success('Download started');
+      toast.success('Download complete!');
     },
     onError: () => {
       toast.error('Failed to download photos');

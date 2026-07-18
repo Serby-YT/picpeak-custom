@@ -544,7 +544,7 @@ router.get('/:slug/download-all', verifyGalleryAccess, async (req, res) => {
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${req.event.slug}.zip"`);
     
-    const archive = archiver('zip', { zlib: { level: 5 } });
+    const archive = archiver('zip', { zlib: { level: 0 } });
     archive.on('error', (err) => {
       throw err;
     });
@@ -661,7 +661,7 @@ router.post('/:slug/download-selected', verifyGalleryAccess, async (req, res) =>
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${archiveName}"`);
 
-    const archive = archiver('zip', { zlib: { level: 5 } });
+    const archive = archiver('zip', { zlib: { level: 0 } });
     archive.on('error', (err) => {
       logger.error('Zip error generating selected download', {
         slug: req.params.slug,

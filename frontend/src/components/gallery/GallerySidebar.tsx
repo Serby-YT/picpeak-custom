@@ -116,7 +116,7 @@ export const GallerySidebar: React.FC<GallerySidebarProps> = ({
       {/* Backdrop for mobile */}
       {isMobile && isOpen && (
         <div
-          className="gallery-sidebar-backdrop fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
+          className="gallery-sidebar-backdrop fixed inset-0 bg-black bg-opacity-50 z-[55] transition-opacity"
           onClick={onClose}
         />
       )}
@@ -125,7 +125,7 @@ export const GallerySidebar: React.FC<GallerySidebarProps> = ({
       <div
         ref={sidebarRef}
         className={`
-          gallery-sidebar fixed top-0 left-0 h-full bg-surface shadow-xl z-50 transition-transform duration-300 ease-in-out flex flex-col
+          gallery-sidebar fixed top-0 left-0 h-full bg-surface shadow-xl z-[60] transition-transform duration-300 ease-in-out flex flex-col
           ${isMobile ? 'w-full max-w-sm' : 'w-80'}
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
