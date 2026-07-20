@@ -13,6 +13,7 @@ const {
   getGenericAuthError
 } = require('../utils/authSecurity');
 const { endSession } = require('../middleware/sessionTimeout');
+const { resolveAdminToken } = require('../middleware/auth');
 const { timingSafeEqualStr } = require('../utils/timingSafe');
 const logger = require('../utils/logger');
 const {
@@ -379,26 +380,52 @@ router.post('/gallery/logout', async (req, res) => {
 router.get('/session', async (req, res) => {
   try {
     const { slug } = req.query;
-    const token = getAdminTokenFromRequest(req) || getGalleryTokenFromRequest(req, slug);
-    
-    if (!token) {
+    const adminToken = getAdminTokenFromRequest(req);
+
+    // Admin tokens go through the exact same verification as the adminAuth
+    // middleware (signature, issuer, revocation, active status, password-change
+    // invalidation). Using anything looser here lets this endpoint report a
+    // token "valid" that every real admin API call then rejects, which sends
+    // the login page and dashboard bouncing off each other forever.
+    if (adminToken) {
+      const result = await resolveAdminToken(adminToken, req);
+
+      if (!result.ok) {
+        return res.json({ valid: false, error: result.body.error, code: result.body.code });
+      }
+
+      const now = Date.now() / 1000;
+      const remainingTime = Math.max(0, result.decoded.exp - now);
+
+      return res.json({
+        valid: true,
+        type: 'admin',
+        expiresIn: Math.floor(remainingTime),
+        user: result.admin.username,
+        adminUsername: result.admin.username
+      });
+    }
+
+    const galleryToken = getGalleryTokenFromRequest(req, slug);
+    if (!galleryToken) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Calculate remaining time
+      const decoded = jwt.verify(galleryToken, process.env.JWT_SECRET, {
+        algorithms: ['HS256'],
+        issuer: 'picpeak-auth'
+      });
+
       const now = Date.now() / 1000;
       const remainingTime = Math.max(0, decoded.exp - now);
-      
+
       res.json({
         valid: true,
         type: decoded.type,
         expiresIn: Math.floor(remainingTime),
-        user: decoded.username || decoded.eventSlug,
-        eventSlug: decoded.eventSlug,
-        adminUsername: decoded.username
+        user: decoded.eventSlug,
+        eventSlug: decoded.eventSlug
       });
     } catch (err) {
       res.json({

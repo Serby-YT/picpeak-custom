@@ -91,9 +91,21 @@ api.interceptors.request.use(
   }
 );
 
+// Guards against an admin-login/dashboard redirect loop: if the session check
+// and a real admin API call ever disagree about whether the token is valid,
+// each 401 would otherwise trigger another hard redirect, which re-triggers
+// the same disagreement, forever. This caps it to one redirect per window.
+const ADMIN_REDIRECT_GUARD_KEY = 'admin_401_redirect_at';
+const ADMIN_REDIRECT_GUARD_WINDOW_MS = 5000;
+
 // Response interceptor to handle errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config?.url?.includes('/admin') && !response.config.url.includes('/public/')) {
+      sessionStorage.removeItem(ADMIN_REDIRECT_GUARD_KEY);
+    }
+    return response;
+  },
   (error) => {
     // Handle maintenance mode (503)
     if (error.response?.status === 503) {
@@ -115,7 +127,14 @@ api.interceptors.response.use(
       if (isAdminRoute) {
         // Only redirect if we're not already on the admin login page
         if (!currentPath.includes('/admin/login')) {
-          window.location.href = '/admin/login';
+          const lastRedirect = Number(sessionStorage.getItem(ADMIN_REDIRECT_GUARD_KEY) || 0);
+          if (Date.now() - lastRedirect > ADMIN_REDIRECT_GUARD_WINDOW_MS) {
+            sessionStorage.setItem(ADMIN_REDIRECT_GUARD_KEY, String(Date.now()));
+            window.location.href = '/admin/login?session=expired';
+          }
+          // else: we already redirected here moments ago and bounced straight
+          // back to a 401 - stop reloading and let this error surface normally
+          // instead of spinning forever.
         }
       } else {
         // For gallery routes, check if the error is from a gallery API call
