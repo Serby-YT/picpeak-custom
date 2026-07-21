@@ -15,6 +15,33 @@ const { getAdminTokenFromRequest, getGalleryTokenFromRequest } = require('../uti
  */
 async function resolveAdminToken(token, req = {}) {
   if (!token) {
+    // Temporary diagnostic: the login/dashboard bounce loop has recurred even
+    // after fixing the verification asymmetry, and every prior 401 in this
+    // path logged nothing, leaving no way to tell whether the cookie header
+    // itself never arrived vs. arrived without admin_token in it. Remove once
+    // the real cause is confirmed.
+    const rawCookieHeader = req.headers?.cookie || '';
+    // Redact values, keep only cookie names/lengths - this still exposes structure
+    // (which cookies arrived, roughly how large) without logging live credentials.
+    const redactedCookies = rawCookieHeader
+      .split(';')
+      .map((pair) => {
+        const idx = pair.indexOf('=');
+        if (idx === -1) return pair.trim();
+        const name = pair.slice(0, idx).trim();
+        const valueLen = pair.slice(idx + 1).trim().length;
+        return `${name}=[${valueLen} chars]`;
+      })
+      .join('; ');
+
+    logger.warn('Admin token missing from request', {
+      path: req.path || req.originalUrl,
+      hasCookieHeader: Boolean(req.headers?.cookie),
+      cookieHeaderLength: rawCookieHeader.length,
+      redactedCookieHeader: redactedCookies || null,
+      parsedCookieNames: req.cookies ? Object.keys(req.cookies) : null,
+      hasAuthHeader: Boolean(req.headers?.authorization)
+    });
     return { ok: false, status: 401, body: { error: 'No token provided' } };
   }
 
