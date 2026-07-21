@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDevToolsProtection } from '../../hooks/useDevToolsProtection';
-import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, MessageSquare, Heart, Star, Loader2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, MessageSquare, Heart, Star, Loader2, Play, Pause } from 'lucide-react';
 import type { Photo } from '../../types';
 import { useDownloadPhoto } from '../../hooks/useGallery';
 import { AuthenticatedImage } from '../common';
@@ -23,7 +23,11 @@ interface PhotoLightboxProps {
   onFeedbackChange?: () => void;
   disableRightClick?: boolean;
   enableDevtoolsProtection?: boolean;
+  initialAutoPlay?: boolean;
 }
+
+const SLIDESHOW_INTERVAL_MS = 4000;
+const SWIPE_THRESHOLD_PX = 50;
 
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   photos,
@@ -39,6 +43,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   onFeedbackChange,
   disableRightClick = false,
   enableDevtoolsProtection = false,
+  initialAutoPlay = false,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [zoom, setZoom] = useState(1);
@@ -46,6 +51,8 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [touchDistance, setTouchDistance] = useState<number | null>(null);
+  const [swipeStart, setSwipeStart] = useState<{ x: number; y: number } | null>(null);
+  const [isPlaying, setIsPlaying] = useState(initialAutoPlay);
   const [showFeedback, setShowFeedback] = useState(initialShowFeedback);
   const [isSmallScreen, setIsSmallScreen] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
   const [feedbackSettings, setFeedbackSettings] = useState<{
@@ -243,12 +250,25 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     } catch {}
   };
 
+  // Slideshow autoplay: advances on a timer while playing, pauses itself the
+  // moment the viewer takes any manual action (arrows, swipe, keyboard).
+  useEffect(() => {
+    if (!isPlaying || photos.length <= 1) return;
+    const id = setInterval(() => {
+      setCurrentIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0));
+      resetZoom();
+    }, SLIDESHOW_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [isPlaying, photos.length]);
+
   const goToPrevious = () => {
+    setIsPlaying(false);
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1));
     resetZoom();
   };
 
   const goToNext = () => {
+    setIsPlaying(false);
     setCurrentIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0));
     resetZoom();
   };
@@ -305,7 +325,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     }
   };
 
-  // Touch event handlers for pinch-to-zoom
+  // Touch event handlers for pinch-to-zoom and single-finger swipe navigation
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const touch1 = e.touches[0];
@@ -315,6 +335,9 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
         touch2.clientY - touch1.clientY
       );
       setTouchDistance(distance);
+      setSwipeStart(null);
+    } else if (e.touches.length === 1 && zoom <= 1) {
+      setSwipeStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     }
   };
 
@@ -334,8 +357,25 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     setTouchDistance(null);
+
+    if (swipeStart && zoom <= 1 && e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0];
+      const deltaX = touch.clientX - swipeStart.x;
+      const deltaY = touch.clientY - swipeStart.y;
+
+      // Require a clearly horizontal gesture so vertical scroll attempts
+      // (e.g. on the feedback panel) don't get mistaken for navigation.
+      if (Math.abs(deltaX) > SWIPE_THRESHOLD_PX && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+        if (deltaX < 0) {
+          goToNext();
+        } else {
+          goToPrevious();
+        }
+      }
+    }
+    setSwipeStart(null);
   };
 
   // Apply protection class to the lightbox container
@@ -411,8 +451,23 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
               <ZoomIn className="w-5 h-5 text-white" />
             </button>
             
+            {photos.length > 1 && (isPlaying || currentPhoto.media_type !== 'video') && (
+              <button
+                onClick={() => setIsPlaying((prev) => !prev)}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                aria-label={isPlaying ? 'Pause slideshow' : 'Play slideshow'}
+                title={isPlaying ? 'Pause slideshow' : 'Play slideshow'}
+              >
+                {isPlaying ? (
+                  <Pause className="w-5 h-5 text-white" />
+                ) : (
+                  <Play className="w-5 h-5 text-white" />
+                )}
+              </button>
+            )}
+
             <div className="w-px h-6 bg-white/20 mx-2" />
-            
+
             {allowDownloads && (
               <button
                 onClick={handleDownload}

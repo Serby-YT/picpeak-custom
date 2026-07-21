@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package } from 'lucide-react';
+import { Package, Play } from 'lucide-react';
 import { toast as toastify } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 
@@ -106,6 +106,7 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
   const { theme } = useTheme();
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [openFeedbackInitially, setOpenFeedbackInitially] = useState<boolean>(false);
+  const [autoPlayLightbox, setAutoPlayLightbox] = useState<boolean>(false);
   const [localSelectedPhotos, setLocalSelectedPhotos] = useState<Set<number>>(new Set());
   const [localSelectionMode, setLocalSelectionMode] = useState(false);
   const downloadPhotoMutation = useDownloadPhoto();
@@ -129,6 +130,12 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
   const handleOpenWithFeedback = (index: number) => {
     setOpenFeedbackInitially(true);
     setSelectedPhotoIndex(index);
+  };
+
+  const handleStartSlideshow = () => {
+    setOpenFeedbackInitially(false);
+    setAutoPlayLightbox(true);
+    setSelectedPhotoIndex(0);
   };
 
   const handlePhotoSelect = (photoId: number) => {
@@ -314,6 +321,17 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
                 {t('gallery.selectAll')}
               </Button>
             )}
+            {!isSelectionMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<Play className="w-4 h-4" />}
+                onClick={handleStartSlideshow}
+                className="text-xs sm:text-sm"
+              >
+                {t('gallery.slideshow')}
+              </Button>
+            )}
           </div>
           
           {isSelectionMode && (
@@ -354,7 +372,7 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
         <PhotoLightbox
           photos={photos}
           initialIndex={selectedPhotoIndex}
-          onClose={() => setSelectedPhotoIndex(null)}
+          onClose={() => { setSelectedPhotoIndex(null); setAutoPlayLightbox(false); }}
           slug={slug}
           feedbackEnabled={feedbackEnabled || false}
           allowDownloads={allowDownloads}
@@ -365,6 +383,7 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
           enableDevtoolsProtection={enableDevtoolsProtection}
           initialShowFeedback={openFeedbackInitially}
           onFeedbackChange={onFeedbackChange}
+          initialAutoPlay={autoPlayLightbox}
         />
       )}
     </>

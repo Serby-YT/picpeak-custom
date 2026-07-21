@@ -270,6 +270,12 @@ function buildSeoMetaTags(seoSettings) {
   return tags.join('\n  ');
 }
 
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
 function buildPublicSiteDocument(payload) {
   const inlineStyles = composeInlineStyles(payload);
   const header = renderBrandHeader(payload.branding);
@@ -523,6 +529,55 @@ try {
     // Landing page handler or SPA fallback
     app.get('/', handlePublicSiteRequest, (req, res) => {
       res.sendFile(indexPath);
+    });
+
+    // Inject Open Graph/Twitter meta tags for gallery link previews. Chat apps
+    // and social platforms don't execute JS - they only read whatever <head>
+    // this initial HTML response has - so the plain SPA index.html (generic
+    // title, no image) makes every shared gallery link look bare. This serves
+    // the same SPA shell with per-gallery meta tags injected first.
+    app.get('/gallery/:slug', async (req, res, next) => {
+      try {
+        const { slug } = req.params;
+        const event = await db('events')
+          .where({ slug, is_active: true, is_archived: false })
+          .select('event_name', 'event_type')
+          .first();
+
+        if (!event) {
+          return next();
+        }
+
+        const baseUrl = (process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+        const pageUrl = `${baseUrl}/gallery/${slug}`;
+        const imageUrl = `${baseUrl}/api/gallery/${slug}/preview-image`;
+        const title = `${event.event_name} - Photo Gallery`;
+        const description = `View and download photos from ${event.event_name}`;
+
+        const html = fs.readFileSync(indexPath, 'utf8');
+        const metaTags = `
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="${escapeHtml(title)}" />
+    <meta property="og:description" content="${escapeHtml(description)}" />
+    <meta property="og:image" content="${escapeHtml(imageUrl)}" />
+    <meta property="og:url" content="${escapeHtml(pageUrl)}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeHtml(title)}" />
+    <meta name="twitter:description" content="${escapeHtml(description)}" />
+    <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />
+  </head>`;
+
+        const injected = html
+          .replace(/<title>.*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
+          .replace('</head>', metaTags);
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.status(200).send(injected);
+      } catch (error) {
+        logger.error('Failed to inject gallery meta tags', { error: error.message, slug: req.params.slug });
+        next();
+      }
     });
 
     // SPA fallback for admin + gallery routes

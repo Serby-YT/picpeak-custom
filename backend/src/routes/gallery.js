@@ -1102,6 +1102,58 @@ router.get('/:slug/hero/:photoId',
   }
 );
 
+// Public gallery preview image (no auth) - used for social link preview cards
+// (Open Graph/Twitter). Deliberately unauthenticated: exposes one designated
+// cover photo so shared gallery links render a real image in chat apps and
+// social platforms, the same way Pixieset's own link previews behave.
+router.get('/:slug/preview-image', async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const event = await db('events')
+      .where({ slug, is_active: formatBoolean(true), is_archived: formatBoolean(false) })
+      .select('id', 'hero_photo_id')
+      .first();
+
+    if (!event) {
+      return res.status(404).end();
+    }
+
+    let photo = null;
+    if (event.hero_photo_id) {
+      photo = await db('photos').where({ id: event.hero_photo_id, event_id: event.id }).first();
+    }
+    if (!photo) {
+      photo = await db('photos')
+        .where({ event_id: event.id })
+        .whereNot('media_type', 'video')
+        .orderBy('id', 'asc')
+        .first();
+    }
+
+    if (!photo) {
+      return res.status(404).end();
+    }
+
+    const heroPath = await ensureHeroImage(photo);
+    if (!heroPath) {
+      return res.status(404).end();
+    }
+
+    const fs = require('fs');
+    const heroFullPath = path.join(getStoragePath(), heroPath);
+    if (!fs.existsSync(heroFullPath)) {
+      return res.status(404).end();
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.sendFile(path.resolve(heroFullPath));
+  } catch (error) {
+    logger.error('Error serving gallery preview image:', { error: error.message, slug: req.params.slug });
+    res.status(500).end();
+  }
+});
+
 // Get feedback settings for gallery
 router.get('/:slug/feedback-settings', verifyGalleryAccess, async (req, res) => {
   try {
