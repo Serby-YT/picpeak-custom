@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDevToolsProtection } from '../../hooks/useDevToolsProtection';
-import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, MessageSquare, Heart, Star, Loader2, Play, Pause } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, Heart, Loader2, Play, Pause } from 'lucide-react';
 import type { Photo } from '../../types';
 import { useDownloadPhoto } from '../../hooks/useGallery';
 import { AuthenticatedImage } from '../common';
@@ -62,13 +62,10 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     require_name_email?: boolean;
   } | null>(null);
   const [myLiked, setMyLiked] = useState<boolean>(false);
-  const [myRating, setMyRating] = useState<number>(0);
   const [likeCount, setLikeCount] = useState<number>(0);
-  const [avgRating, setAvgRating] = useState<number>(0);
-  const [totalRatings, setTotalRatings] = useState<number>(0);
   const [savedIdentity, setSavedIdentity] = useState<{ name: string; email: string } | null>(null);
   const [showIdentityModal, setShowIdentityModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<null | { type: 'like' | 'rating'; rating?: number }>(null);
+  const [pendingLike, setPendingLike] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
@@ -198,10 +195,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
         const data = await feedbackService.getPhotoFeedback(slug, String(currentPhoto.id));
         if (!mounted) return;
         setMyLiked(!!data.my_feedback.liked);
-        setMyRating(data.my_feedback.rating || 0);
         setLikeCount(Number(data.summary?.like_count) || 0);
-        setAvgRating(Number(data.summary?.average_rating) || 0);
-        setTotalRatings(Number(data.summary?.total_ratings) || 0);
       } catch {
         // ignore
       }
@@ -212,7 +206,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   const submitLike = async () => {
     const needIdentity = feedbackSettings?.require_name_email && !savedIdentity;
     if (needIdentity) {
-      setPendingAction({ type: 'like' });
+      setPendingLike(true);
       setShowIdentityModal(true);
       return;
     }
@@ -226,28 +220,6 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       setLikeCount(c => Math.max(0, c + (next ? 1 : -1)));
       return next;
     });
-  };
-
-  const submitRating = async (value: number) => {
-    const needIdentity = feedbackSettings?.require_name_email && !savedIdentity;
-    if (needIdentity) {
-      setPendingAction({ type: 'rating', rating: value });
-      setShowIdentityModal(true);
-      return;
-    }
-    await feedbackService.submitFeedback(slug, String(currentPhoto.id), {
-      feedback_type: 'rating',
-      rating: value,
-      guest_name: savedIdentity?.name,
-      guest_email: savedIdentity?.email,
-    });
-    setMyRating(value);
-    // Refresh current summary to reflect average and totals
-    try {
-      const fresh = await feedbackService.getPhotoFeedback(slug, String(currentPhoto.id));
-      setAvgRating(Number(fresh.summary?.average_rating) || 0);
-      setTotalRatings(Number(fresh.summary?.total_ratings) || 0);
-    } catch {}
   };
 
   // Slideshow autoplay: advances on a timer while playing, pauses itself the
@@ -439,9 +411,6 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             >
               <ZoomOut className="w-5 h-5 text-white" />
             </button>
-            <span className="text-white text-sm w-12 text-center">
-              {Math.round(zoom * 100)}%
-            </span>
             <button
               onClick={handleZoomIn}
               disabled={zoom >= 3}
@@ -493,42 +462,6 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
               </div>
             )}
 
-            {/* Inline Rating */}
-            {feedbackEnabled && feedbackSettings?.allow_ratings && (
-              <div className="flex items-center gap-1 ml-1" aria-label="Rate photo">
-                {[1,2,3,4,5].map((i) => (
-                  <button
-                    key={i}
-                    onClick={() => submitRating(i)}
-                    className="p-1"
-                    aria-label={`Rate ${i} star${i>1?'s':''}`}
-                    title={`Rate ${i}`}
-                  >
-                    <Star className={`w-5 h-5 ${myRating >= i ? 'text-yellow-400 fill-yellow-400' : 'text-white/70'}`} />
-                  </button>
-                ))}
-                <span className="text-white/90 text-xs ml-2 select-none">{avgRating.toFixed(1)} ({totalRatings})</span>
-              </div>
-            )}
-            
-            {/* Feedback button with indicator */}
-            {feedbackEnabled && (
-              <button
-                onClick={() => {
-                  setShowFeedback(!showFeedback);
-                }}
-                className="relative p-2 bg-black/40 hover:bg-black/60 rounded-full border border-white/40 transition-colors"
-                aria-label="Toggle feedback"
-                title={`Photo feedback${(currentPhoto.comment_count ?? 0) > 0 ? ` (${currentPhoto.comment_count ?? 0} comments)` : ''}`}
-              >
-                <MessageSquare className="w-5 h-5 text-white" />
-                {((currentPhoto.comment_count ?? 0) > 0 || (currentPhoto.average_rating ?? 0) > 0) && (
-                  <span className="absolute -top-1 -right-1 bg-primary-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {(currentPhoto.comment_count ?? 0) > 0 ? currentPhoto.comment_count ?? 0 : '★'}
-                  </span>
-                )}
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -651,29 +584,21 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       {/* Identity Modal for required name/email */}
       <FeedbackIdentityModal
         isOpen={showIdentityModal}
-        onClose={() => { setShowIdentityModal(false); setPendingAction(null); }}
+        onClose={() => { setShowIdentityModal(false); setPendingLike(false); }}
         onSubmit={async (name, email) => {
           setSavedIdentity({ name, email });
           setShowIdentityModal(false);
-          if (pendingAction?.type === 'like') {
+          if (pendingLike) {
             await feedbackService.submitFeedback(slug, String(currentPhoto.id), {
               feedback_type: 'like',
               guest_name: name,
               guest_email: email,
             });
             setMyLiked(true);
-          } else if (pendingAction?.type === 'rating' && pendingAction.rating) {
-            await feedbackService.submitFeedback(slug, String(currentPhoto.id), {
-              feedback_type: 'rating',
-              rating: pendingAction.rating,
-              guest_name: name,
-              guest_email: email,
-            });
-            setMyRating(pendingAction.rating);
           }
-          setPendingAction(null);
+          setPendingLike(false);
         }}
-        feedbackType={pendingAction?.type === 'rating' ? 'rating' : 'like'}
+        feedbackType="like"
       />
     </div>
   );
