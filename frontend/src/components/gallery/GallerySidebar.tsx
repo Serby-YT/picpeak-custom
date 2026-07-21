@@ -4,10 +4,12 @@ import { Button } from '../common';
 import { PhotoCategory } from '../../types';
 import { useTranslation } from 'react-i18next';
 import { GalleryFilter, type FilterType } from './GalleryFilter';
+import { SelectionSubmitPanel } from './SelectionSubmitPanel';
 
 interface GallerySidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  slug: string;
   categories: PhotoCategory[];
   selectedCategoryId: number | string | null;
   onCategoryChange: (categoryId: number | string | null) => void;
@@ -44,6 +46,7 @@ interface GallerySidebarProps {
 export const GallerySidebar: React.FC<GallerySidebarProps> = ({
   isOpen,
   onClose,
+  slug,
   categories,
   selectedCategoryId,
   onCategoryChange,
@@ -240,6 +243,11 @@ export const GallerySidebar: React.FC<GallerySidebarProps> = ({
                 variant="compact"
               />
             </div>
+          )}
+
+          {/* Selection Submission Section - lets a client lock in their final favorites for the photographer */}
+          {feedbackEnabled && (
+            <SelectionSubmitPanel slug={slug} favoriteCount={favoriteCount} />
           )}
 
           {/* Categories Section - Hidden for carousel layout */}

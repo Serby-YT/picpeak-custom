@@ -499,6 +499,7 @@ app.use('/api/admin/system', require('./src/routes/adminSystem'));
 app.use('/api/admin/backup', require('./src/routes/adminBackup'));
 app.use('/api/admin/database-backup', require('./src/routes/adminDatabaseBackup'));
 app.use('/api/admin/feedback', require('./src/routes/adminFeedback'));
+app.use('/api/admin/selections', require('./src/routes/adminSelections'));
 app.use('/api/admin/image-security', require('./src/routes/adminImageSecurity'));
 app.use('/api/admin/thumbnails', require('./src/routes/adminThumbnails'));
 app.use('/api/admin/photos', require('./src/routes/adminPhotoDimensions'));

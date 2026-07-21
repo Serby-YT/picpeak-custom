@@ -647,6 +647,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
         <GallerySidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(!sidebarOpen)}
+          slug={slug}
           categories={(data?.categories || []).filter(cat => photoCounts[cat.id] > 0)}
           selectedCategoryId={selectedCategoryId}
           onCategoryChange={setSelectedCategoryId}

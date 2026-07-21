@@ -53,7 +53,7 @@ import { toast } from 'react-toastify';
 import { useLocalizedDate } from '../../hooks/useLocalizedDate';
 
 import { Button, Input, Card, Loading } from '../../components/common';
-import { EventCategoryManager, AdminPhotoGrid, AdminPhotoViewer, PhotoFilters, PasswordResetModal, ThemeCustomizerEnhanced, ThemeDisplay, HeroPhotoSelector, FocalPointPicker, PhotoUploadModal, FeedbackSettings, FeedbackModerationPanel, EventRenameDialog, PhotoFilterPanel, PhotoExportMenu, GalleryQRCodeModal } from '../../components/admin';
+import { EventCategoryManager, AdminPhotoGrid, AdminPhotoViewer, PhotoFilters, PasswordResetModal, ThemeCustomizerEnhanced, ThemeDisplay, HeroPhotoSelector, FocalPointPicker, PhotoUploadModal, FeedbackSettings, FeedbackModerationPanel, EventRenameDialog, PhotoFilterPanel, PhotoExportMenu, GalleryQRCodeModal, EventSelectionsPanel } from '../../components/admin';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventsService } from '../../services/events.service';
 import { publicSettingsService } from '../../services/publicSettings.service';
@@ -220,7 +220,7 @@ export const EventDetailsPage: React.FC = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [showExternalImport, setShowExternalImport] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'photos' | 'categories'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'photos' | 'categories' | 'selections'>('overview');
   const [externalPath, setExternalPath] = useState<string>('');
   const [importing, setImporting] = useState<boolean>(false);
   const [selectedPhoto, setSelectedPhoto] = useState<{ photo: AdminPhoto; index: number } | null>(null);
@@ -826,6 +826,16 @@ export const EventDetailsPage: React.FC = () => {
             }`}
           >
             {t('events.categories')}
+          </button>
+          <button
+            onClick={() => setActiveTab('selections')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'selections'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 hover:border-neutral-300 dark:hover:border-neutral-600'
+            }`}
+          >
+            {t('events.selectionsTab', 'Selections')}
           </button>
         </nav>
       </div>
@@ -1825,6 +1835,10 @@ export const EventDetailsPage: React.FC = () => {
             </div>
           </Card>
         </div>
+      )}
+
+      {activeTab === 'selections' && (
+        <EventSelectionsPanel eventId={parseInt(id!)} />
       )}
 
       {/* Password Reset Modal */}

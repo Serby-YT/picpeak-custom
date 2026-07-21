@@ -240,13 +240,17 @@ router.post('/:slug/photos/:photoId/feedback',
         guestIdentifier
       );
       
-      // Log activity
+      // Log activity. actor_id is an integer column (admin user id when
+      // actor_type='admin') - guest actions have no integer id, so this was
+      // previously passing a hex string here, which the insert silently
+      // rejected and dropped every guest feedback notification.
       await logActivity(`guest_feedback_${feedbackType}`, {
         photo_id: photoId,
+        guest_identifier: guestIdentifier.substring(0, 16),
         result
       }, event.id, {
         type: 'guest',
-        id: guestIdentifier.substring(0, 16),
+        id: null,
         name: req.body.guest_name || 'Anonymous'
       });
       
@@ -336,6 +340,127 @@ router.get('/:slug/my-feedback',
     } catch (error) {
       logger.error('Error getting user feedback:', error);
       res.status(500).json({ error: 'Failed to get your feedback' });
+    }
+  }
+);
+
+// Submit a final photo selection - snapshots the guest's currently favorited
+// photos into a locked record, distinct from ad-hoc favoriting which can keep
+// changing. This is what notifies the photographer which photos to work from.
+router.post('/:slug/selections/submit',
+  verifyGalleryAccess,
+  async (req, res) => {
+    try {
+      const event = req.event;
+      const guestIdentifier = generateGuestIdentifier(req);
+      const guestName = (req.body.guest_name || '').trim();
+      const guestEmail = (req.body.guest_email || '').trim();
+      const notes = (req.body.notes || '').trim();
+
+      const settings = await feedbackService.getEventFeedbackSettings(event.id);
+      if (!settings.feedback_enabled || !settings.allow_favorites) {
+        return res.status(403).json({ error: 'Photo selection is not enabled for this gallery' });
+      }
+
+      // A name is always required for a submitted selection, even if the
+      // event doesn't require identity for casual likes - the photographer
+      // needs to know whose final picks these are.
+      if (!guestName) {
+        return res.status(400).json({ error: 'Please enter your name so we know whose selection this is' });
+      }
+
+      const favorited = await db('photo_feedback')
+        .join('photos', 'photo_feedback.photo_id', 'photos.id')
+        .where({
+          'photo_feedback.event_id': event.id,
+          'photo_feedback.guest_identifier': guestIdentifier,
+          'photo_feedback.feedback_type': 'favorite'
+        })
+        .select('photos.id');
+
+      if (favorited.length === 0) {
+        return res.status(400).json({ error: 'Favorite at least one photo before submitting your selection' });
+      }
+
+      const insertResult = await db('gallery_selections')
+        .insert({
+          event_id: event.id,
+          guest_identifier: guestIdentifier,
+          guest_name: guestName.slice(0, 100),
+          guest_email: guestEmail ? guestEmail.slice(0, 255) : null,
+          notes: notes ? notes.slice(0, 2000) : null,
+          photo_count: favorited.length,
+          submitted_at: new Date()
+        })
+        .returning('id');
+      const selectionId = insertResult[0]?.id || insertResult[0];
+
+      await db('gallery_selection_photos').insert(
+        favorited.map(p => ({ selection_id: selectionId, photo_id: p.id }))
+      );
+
+      // actor_id is an integer column (admin user id when actor_type='admin');
+      // guest actions have no integer id, so leave it null - only actor_name
+      // identifies the guest here.
+      await logActivity('guest_selection_submitted', {
+        selection_id: selectionId,
+        photo_count: favorited.length
+      }, event.id, {
+        type: 'guest',
+        id: null,
+        name: guestName
+      });
+
+      res.json({
+        success: true,
+        selection: {
+          id: selectionId,
+          photo_count: favorited.length,
+          submitted_at: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      logger.error('Error submitting gallery selection:', error);
+      res.status(500).json({ error: 'Failed to submit selection' });
+    }
+  }
+);
+
+// Get the current guest's most recent submitted selection, if any, so
+// returning visitors see their submitted state instead of a blank slate.
+router.get('/:slug/selections/mine',
+  verifyGalleryAccess,
+  async (req, res) => {
+    try {
+      const event = req.event;
+      const guestIdentifier = generateGuestIdentifier(req);
+
+      const selection = await db('gallery_selections')
+        .where({ event_id: event.id, guest_identifier: guestIdentifier })
+        .orderBy('submitted_at', 'desc')
+        .first();
+
+      if (!selection) {
+        return res.json({ selection: null });
+      }
+
+      const photos = await db('gallery_selection_photos')
+        .join('photos', 'gallery_selection_photos.photo_id', 'photos.id')
+        .where('gallery_selection_photos.selection_id', selection.id)
+        .select('photos.id', 'photos.filename');
+
+      res.json({
+        selection: {
+          id: selection.id,
+          photo_count: selection.photo_count,
+          submitted_at: selection.submitted_at,
+          notes: selection.notes,
+          photos
+        }
+      });
+    } catch (error) {
+      logger.error('Error getting selection:', error);
+      res.status(500).json({ error: 'Failed to get your selection' });
     }
   }
 );

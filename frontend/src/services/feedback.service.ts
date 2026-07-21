@@ -59,6 +59,14 @@ export interface FeedbackResponse {
   };
 }
 
+export interface GallerySelection {
+  id: number;
+  photo_count: number;
+  submitted_at: string;
+  notes?: string | null;
+  photos: Array<{ id: number; filename: string }>;
+}
+
 export interface FeedbackAnalytics {
   summary: {
     total_feedback: number;
@@ -197,6 +205,16 @@ class FeedbackService {
   async getMyFeedback(slug: string) {
     const response = await api.get(`/gallery/${slug}/my-feedback`);
     return response.data;
+  }
+
+  async submitSelection(slug: string, data: { guest_name: string; guest_email?: string; notes?: string }) {
+    const response = await api.post(`/gallery/${slug}/selections/submit`, data);
+    return response.data as { success: boolean; selection: { id: number; photo_count: number; submitted_at: string } };
+  }
+
+  async getMySelection(slug: string) {
+    const response = await api.get(`/gallery/${slug}/selections/mine`);
+    return response.data as { selection: GallerySelection | null };
   }
 }
 

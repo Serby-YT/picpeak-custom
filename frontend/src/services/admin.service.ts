@@ -1,5 +1,25 @@
 import { api } from '../config/api';
 
+export interface GallerySelectionSummary {
+  id: number;
+  guest_name: string;
+  guest_email: string | null;
+  notes: string | null;
+  photo_count: number;
+  submitted_at: string;
+}
+
+export interface GallerySelectionDetail {
+  selection: GallerySelectionSummary;
+  photos: Array<{
+    id: number;
+    filename: string;
+    thumbnail_url: string;
+    average_rating?: number;
+    like_count?: number;
+  }>;
+}
+
 export interface DashboardStats {
   activeEvents: number;
   expiringEvents: number;
@@ -151,5 +171,16 @@ export const adminService = {
   async updateAdminProfile(data: { username: string; email: string }): Promise<AdminProfile> {
     const response = await api.put<{ user: AdminProfile }>('/admin/auth/profile', data);
     return response.data.user;
+  },
+
+  // Client-submitted photo selections (proofing)
+  async getEventSelections(eventId: number): Promise<GallerySelectionSummary[]> {
+    const response = await api.get<{ selections: GallerySelectionSummary[] }>(`/admin/selections/${eventId}`);
+    return response.data.selections;
+  },
+
+  async getSelectionDetail(eventId: number, selectionId: number): Promise<GallerySelectionDetail> {
+    const response = await api.get<GallerySelectionDetail>(`/admin/selections/${eventId}/${selectionId}`);
+    return response.data;
   }
 };
