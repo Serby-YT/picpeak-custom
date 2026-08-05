@@ -409,6 +409,10 @@ router.get('/:slug/photos', verifyGalleryAccess, async (req, res) => {
           category_slug: photo.category_id && categoryMap[photo.category_id] ? categoryMap[photo.category_id].slug : null,
           size: photo.size_bytes,
           uploaded_at: photo.uploaded_at,
+          // EXIF capture time - the client sorts chronologically by this, and
+          // without it every photo falls back to upload time, which is
+          // identical across a whole upload batch and destroys the ordering.
+          captured_at: photo.captured_at || null,
           // Image dimensions for layout calculations
           width: photo.width || null,
           height: photo.height || null,
