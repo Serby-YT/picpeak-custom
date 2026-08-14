@@ -257,24 +257,36 @@ router.get('/analytics', adminAuth, requirePermission('analytics.view'), async (
       .where('timestamp', '>=', startDateStr)
       .groupByRaw('DATE(timestamp)');
 
-    // Merge data into dates array
-    viewsData.forEach(row => {
-      const dateObj = dates.find(d => d.date === row.date);
-      if (dateObj) dateObj.views = row.count;
-    });
+    // Merge data into dates array.
+    // Postgres returns DATE(...) as a JS Date object and COUNT(...) as a
+    // string, while `dates` is keyed by 'YYYY-MM-DD' strings. Comparing those
+    // directly with === never matched, so every bucket silently stayed 0 and
+    // the dashboard reported no traffic despite real access_logs data.
+    const toDateKey = (value) => {
+      if (value instanceof Date) {
+        // Use UTC parts - DATE() is already a calendar date with no timezone,
+        // and toISOString() would shift it for negative-offset servers.
+        const y = value.getUTCFullYear();
+        const m = String(value.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(value.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      return String(value).split('T')[0];
+    };
 
-    downloadsData.forEach(row => {
-      const dateObj = dates.find(d => d.date === row.date);
-      if (dateObj) dateObj.downloads = row.count;
-    });
+    const mergeInto = (rows, field) => {
+      rows.forEach(row => {
+        const dateObj = dates.find(d => d.date === toDateKey(row.date));
+        if (dateObj) dateObj[field] = Number(row.count) || 0;
+      });
+    };
 
-    visitorsData.forEach(row => {
-      const dateObj = dates.find(d => d.date === row.date);
-      if (dateObj) dateObj.uniqueVisitors = row.count;
-    });
+    mergeInto(viewsData, 'views');
+    mergeInto(downloadsData, 'downloads');
+    mergeInto(visitorsData, 'uniqueVisitors');
 
     // Get top galleries by views with additional metrics
-    const topGalleries = await db('access_logs')
+    const topGalleriesRaw = await db('access_logs')
       .select('events.id', 'events.event_name', 'events.slug')
       .select(db.raw('COUNT(CASE WHEN action = \'view\' THEN 1 END) as views'))
       .select(db.raw('COUNT(DISTINCT CASE WHEN action = \'view\' THEN ip_address END) as uniqueVisitors'))
@@ -284,6 +296,15 @@ router.get('/analytics', adminAuth, requirePermission('analytics.view'), async (
       .groupBy('events.id', 'events.event_name', 'events.slug')
       .orderBy('views', 'desc')
       .limit(5);
+
+    // Counts arrive as strings from Postgres; hand the client real numbers
+    // so arithmetic and sorting behave.
+    const topGalleries = topGalleriesRaw.map(g => ({
+      ...g,
+      views: Number(g.views) || 0,
+      uniqueVisitors: Number(g.uniqueVisitors ?? g.uniquevisitors) || 0,
+      downloads: Number(g.downloads) || 0
+    }));
 
     // Get device breakdown (simplified - based on user agent)
     const deviceData = await db('access_logs')
@@ -300,16 +321,21 @@ router.get('/analytics', adminAuth, requirePermission('analytics.view'), async (
       .where('timestamp', '>=', startDateStr)
       .groupBy('device_type');
 
-    const totalDevices = deviceData.reduce((sum, d) => sum + d.count, 0);
+    // COUNT(*) comes back as a string, so summing it without coercion
+    // concatenated the values ("0" + "95" + "52" = "09552") and made every
+    // device share round to ~0%.
+    const totalDevices = deviceData.reduce((sum, d) => sum + (Number(d.count) || 0), 0);
     const devices = {
       desktop: 0,
       mobile: 0,
       tablet: 0
     };
 
-    deviceData.forEach(d => {
-      devices[d.device_type] = Math.round((d.count / totalDevices) * 100);
-    });
+    if (totalDevices > 0) {
+      deviceData.forEach(d => {
+        devices[d.device_type] = Math.round(((Number(d.count) || 0) / totalDevices) * 100);
+      });
+    }
 
     // Calculate totals for the period (matching /stats logic)
     const totalViews = await db('access_logs')
@@ -334,9 +360,9 @@ router.get('/analytics', adminAuth, requirePermission('analytics.view'), async (
       topGalleries,
       devices,
       totals: {
-        views: totalViews?.count || 0,
-        downloads: totalDownloadsCount?.count || 0,
-        uniqueVisitors: totalUniqueVisitors?.count || 0
+        views: Number(totalViews?.count) || 0,
+        downloads: Number(totalDownloadsCount?.count) || 0,
+        uniqueVisitors: Number(totalUniqueVisitors?.count) || 0
       }
     });
   } catch (error) {

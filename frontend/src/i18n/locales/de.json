@@ -1954,8 +1954,8 @@
     "of": "von",
     "totalPhotos": "Gesamte Fotos",
     "activeEvents": "Aktive Veranstaltungen",
-    "notConfigured": "Umami Analytics nicht konfiguriert",
-    "configureInstructions": "Um echte Analysedaten zu sehen, konfigurieren Sie Umami in Ihren Umgebungsvariablen und Admin-Panel-Einstellungen.",
+    "notConfigured": "Optional: Umami für erweiterte Analysen verbinden",
+    "configureInstructions": "Die Zahlen oben werden von Ihrem eigenen Server erfasst und sind bereits korrekt. Umami ist eine optionale Ergänzung für Verweise, Herkunft und Live-Besucherdaten.",
     "noData": "Keine Daten verfügbar",
     "percentChange": "{{percent}}% gegenüber letztem Zeitraum"
   },

@@ -502,12 +502,12 @@ export const AnalyticsPage: React.FC = () => {
 
       {/* Configuration Notice */}
       {umamiConfig.enabled === false && (
-        <Card padding="md" className="mt-6 bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800">
+        <Card padding="md" className="mt-6 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
           <div className="flex items-start gap-3">
-            <Activity className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{t('analytics.notConfigured')}</p>
-              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-200">{t('analytics.notConfigured')}</p>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                 {t('analytics.configureInstructions')}
               </p>
             </div>

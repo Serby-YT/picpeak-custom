@@ -1001,8 +1001,8 @@
     "of": "of",
     "totalPhotos": "Total Photos",
     "activeEvents": "Active Events",
-    "notConfigured": "Umami Analytics Not Configured",
-    "configureInstructions": "To see real analytics data, configure Umami in your environment variables and admin panel settings.",
+    "notConfigured": "Optional: connect Umami for deeper analytics",
+    "configureInstructions": "The numbers above are tracked by your own server and are already accurate. Umami is an optional add-on that adds referrers, geography and live visitor data.",
     "noData": "No data available",
     "percentChange": "{{percent}}% from last period"
   },
