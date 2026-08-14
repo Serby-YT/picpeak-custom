@@ -515,6 +515,99 @@ app.use('/api/public', require('./src/routes/publicCMS'));
 app.use('/api/images', require('./src/routes/protectedImages'));
 app.use('/api/secure-images', secureImagesRoutes);
 
+// Inject Open Graph/Twitter meta tags for gallery link previews. Chat apps and
+// social platforms don't execute JS - they only read the <head> of the initial
+// HTML response - so the plain SPA shell (generic title, no image) makes every
+// shared gallery link preview as a bare URL.
+//
+// Registered unconditionally: in the Docker deployment the backend has no
+// frontend/dist, so anything inside the optional static-serving block below
+// never registers at all. The SPA shell is fetched over HTTP from the frontend
+// container instead (nginx proxies /gallery/<slug> here).
+const SPA_SHELL_URL = process.env.SPA_SHELL_URL || 'http://frontend/index.html';
+let spaShellCache = { html: null, fetchedAt: 0 };
+
+async function getSpaShell() {
+  const now = Date.now();
+  if (spaShellCache.html && now - spaShellCache.fetchedAt < 60000) {
+    return spaShellCache.html;
+  }
+
+  // Local dist wins when present (native installs), otherwise ask the frontend.
+  const localIndex = path.join(process.env.FRONTEND_DIR || path.join(__dirname, '../frontend/dist'), 'index.html');
+  if (fs.existsSync(localIndex)) {
+    const html = fs.readFileSync(localIndex, 'utf8');
+    spaShellCache = { html, fetchedAt: now };
+    return html;
+  }
+
+  const response = await fetch(SPA_SHELL_URL);
+  if (!response.ok) {
+    throw new Error(`SPA shell fetch failed: ${response.status}`);
+  }
+  const html = await response.text();
+  spaShellCache = { html, fetchedAt: now };
+  return html;
+}
+
+// Hand back the untouched SPA shell so the client-side app renders its own
+// "gallery not found"/expired screens. Falling through to next() here would
+// produce a bare Express 404, since nginx now routes these URLs to us.
+async function sendPlainSpaShell(res, next) {
+  try {
+    const html = await getSpaShell();
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.status(200).send(html);
+  } catch (error) {
+    return next();
+  }
+}
+
+app.get('/gallery/:slug', async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const event = await db('events')
+      .where({ slug, is_active: true, is_archived: false })
+      .select('event_name')
+      .first();
+
+    if (!event) {
+      return sendPlainSpaShell(res, next);
+    }
+
+    const baseUrl = (process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+    const pageUrl = `${baseUrl}/gallery/${slug}`;
+    const imageUrl = `${baseUrl}/api/gallery/${slug}/preview-image`;
+    const title = `${event.event_name} - Photo Gallery`;
+    const description = `View and download photos from ${event.event_name}`;
+
+    const html = await getSpaShell();
+    const metaTags = `
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="${escapeHtml(title)}" />
+    <meta property="og:description" content="${escapeHtml(description)}" />
+    <meta property="og:image" content="${escapeHtml(imageUrl)}" />
+    <meta property="og:url" content="${escapeHtml(pageUrl)}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeHtml(title)}" />
+    <meta name="twitter:description" content="${escapeHtml(description)}" />
+    <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />
+  </head>`;
+
+    const injected = html
+      .replace(/<title>.*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
+      .replace('</head>', metaTags);
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.status(200).send(injected);
+  } catch (error) {
+    logger.error('Failed to inject gallery meta tags', { error: error.message, slug: req.params.slug });
+    return sendPlainSpaShell(res, next);
+  }
+});
+
 // Optional: Serve built frontend (native installs)
 try {
   const serveFrontendEnv = process.env.SERVE_FRONTEND; // 'true' | 'false' | undefined
@@ -530,55 +623,6 @@ try {
     // Landing page handler or SPA fallback
     app.get('/', handlePublicSiteRequest, (req, res) => {
       res.sendFile(indexPath);
-    });
-
-    // Inject Open Graph/Twitter meta tags for gallery link previews. Chat apps
-    // and social platforms don't execute JS - they only read whatever <head>
-    // this initial HTML response has - so the plain SPA index.html (generic
-    // title, no image) makes every shared gallery link look bare. This serves
-    // the same SPA shell with per-gallery meta tags injected first.
-    app.get('/gallery/:slug', async (req, res, next) => {
-      try {
-        const { slug } = req.params;
-        const event = await db('events')
-          .where({ slug, is_active: true, is_archived: false })
-          .select('event_name', 'event_type')
-          .first();
-
-        if (!event) {
-          return next();
-        }
-
-        const baseUrl = (process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-        const pageUrl = `${baseUrl}/gallery/${slug}`;
-        const imageUrl = `${baseUrl}/api/gallery/${slug}/preview-image`;
-        const title = `${event.event_name} - Photo Gallery`;
-        const description = `View and download photos from ${event.event_name}`;
-
-        const html = fs.readFileSync(indexPath, 'utf8');
-        const metaTags = `
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="${escapeHtml(title)}" />
-    <meta property="og:description" content="${escapeHtml(description)}" />
-    <meta property="og:image" content="${escapeHtml(imageUrl)}" />
-    <meta property="og:url" content="${escapeHtml(pageUrl)}" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${escapeHtml(title)}" />
-    <meta name="twitter:description" content="${escapeHtml(description)}" />
-    <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />
-  </head>`;
-
-        const injected = html
-          .replace(/<title>.*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
-          .replace('</head>', metaTags);
-
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', 'public, max-age=300');
-        res.status(200).send(injected);
-      } catch (error) {
-        logger.error('Failed to inject gallery meta tags', { error: error.message, slug: req.params.slug });
-        next();
-      }
     });
 
     // SPA fallback for admin + gallery routes

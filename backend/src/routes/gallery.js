@@ -14,6 +14,7 @@ const { getEventShareToken, resolveShareIdentifier, buildShareLinkVariants } = r
 const { handleAsync } = require('../utils/routeHelpers');
 const { NotFoundError } = require('../utils/errors');
 const { ensureThumbnail, ensureHeroImage, ensureDisplayImage } = require('../services/imageProcessor');
+const { timingSafeEqualStr } = require('../utils/timingSafe');
 
 // Get storage path from environment or default
 const getStoragePath = () => process.env.STORAGE_PATH || path.join(__dirname, '../../../storage');
@@ -83,7 +84,10 @@ router.get('/:slug/verify-token/:token', handleAsync(async (req, res) => {
   }
 
   const expectedToken = getEventShareToken(event);
-  if (token !== expectedToken) {
+  // Constant-time compare - a plain !== leaks how many characters matched
+  // via response timing, which lets a share token be brute-forced one
+  // character at a time.
+  if (!expectedToken || !timingSafeEqualStr(token, expectedToken)) {
     throw new NotFoundError('Gallery', 'Invalid gallery link');
   }
 
@@ -147,7 +151,7 @@ router.get('/:slug/info', async (req, res) => {
     // If token provided, verify it matches the share link
     if (token) {
       const expectedToken = getEventShareToken(event);
-      if (!expectedToken || token !== expectedToken) {
+      if (!expectedToken || !timingSafeEqualStr(token, expectedToken)) {
         return res.status(404).json({ error: 'Invalid gallery link' });
       }
     }
@@ -1150,8 +1154,24 @@ router.get('/:slug/preview-image', async (req, res) => {
       return res.status(404).end();
     }
 
+    // Social crawlers want a modest 1200x630 card, not the full 4K hero.
+    // WhatsApp in particular tends to silently skip the preview on multi-MB
+    // images, so serve a small JPEG (cached on disk after first generation).
+    const previewDir = path.join(getStoragePath(), 'preview');
+    const previewFullPath = path.join(previewDir, `og_${event.id}_${photo.id}.jpg`);
+
+    if (!fs.existsSync(previewFullPath)) {
+      const sharp = require('sharp');
+      await fs.promises.mkdir(previewDir, { recursive: true });
+      await sharp(heroFullPath, { failOnError: false })
+        .resize(1200, 630, { fit: 'cover', position: 'attention' })
+        .jpeg({ quality: 82, progressive: true })
+        .toFile(previewFullPath);
+    }
+
+    res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(path.resolve(heroFullPath));
+    res.sendFile(path.resolve(previewFullPath));
   } catch (error) {
     logger.error('Error serving gallery preview image:', { error: error.message, slug: req.params.slug });
     res.status(500).end();

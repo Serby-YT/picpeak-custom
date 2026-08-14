@@ -94,6 +94,31 @@ services:
       timeout: 10s
       retries: 3
 
+  # Umami - self-hosted, cookie-free web analytics.
+  # Reuses the existing Postgres (separate 'umami' database) rather than
+  # running a second database container.
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: picpeak-umami
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-picpeak}:${DB_PASSWORD}@postgres:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET}
+    ports:
+      - "${UMAMI_PORT:-3003}:3000"
+    networks:
+      - picpeak-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/heartbeat >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   # Optional: Nginx reverse proxy for production with SSL
   # Uncomment and configure if you want built-in HTTPS support
   # nginx:
