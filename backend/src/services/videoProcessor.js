@@ -1,11 +1,59 @@
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const fsSync = require('fs');
 const path = require('path');
 const fs = require('fs').promises;
 const logger = require('../utils/logger');
 
-// Set FFmpeg path
-ffmpeg.setFfmpegPath(ffmpegPath);
+/**
+ * Resolve an ffmpeg-family binary.
+ *
+ * Prefer the system build: Alpine's `ffmpeg` package ships both ffmpeg and
+ * ffprobe and stays current. The bundled @ffmpeg-installer build ships ffmpeg
+ * ONLY, so without a system ffprobe every metadata read fails and uploads are
+ * rejected as "Invalid video file".
+ */
+function resolveBinary(name, envVar, bundled) {
+  const candidates = [
+    process.env[envVar],
+    `/usr/bin/${name}`,
+    `/usr/local/bin/${name}`,
+    bundled
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      fsSync.accessSync(candidate, fsSync.constants.X_OK);
+      return candidate;
+    } catch (err) {
+      // Not usable, try the next candidate.
+    }
+  }
+  return null;
+}
+
+let bundledFfmpeg = null;
+try {
+  bundledFfmpeg = require('@ffmpeg-installer/ffmpeg').path;
+} catch (err) {
+  logger.warn('Bundled ffmpeg package unavailable', { error: err.message });
+}
+
+const ffmpegPath = resolveBinary('ffmpeg', 'FFMPEG_PATH', bundledFfmpeg);
+const ffprobePath = resolveBinary('ffprobe', 'FFPROBE_PATH', null);
+
+if (ffmpegPath) {
+  ffmpeg.setFfmpegPath(ffmpegPath);
+} else {
+  logger.error('No ffmpeg binary found - video processing will fail');
+}
+
+if (ffprobePath) {
+  ffmpeg.setFfprobePath(ffprobePath);
+} else {
+  logger.error('No ffprobe binary found - video metadata extraction will fail');
+}
+
+logger.info('Video processing binaries resolved', { ffmpegPath, ffprobePath });
 
 /**
  * Extract video metadata using FFmpeg
@@ -171,9 +219,93 @@ function isVideoMimeType(mimeType) {
   return mimeType && mimeType.startsWith('video/');
 }
 
+// Hover preview defaults: a short muted montage, YouTube-style.
+const PREVIEW_SEGMENTS = 3;
+const PREVIEW_SEGMENT_SECONDS = 1.5;
+const PREVIEW_WIDTH = 480;
+
+/**
+ * Generate a short, muted hover-preview clip.
+ *
+ * Samples a few evenly spaced segments and concatenates them, rather than
+ * taking the head of the file - the first seconds of an event film are usually
+ * titles or establishing shots and say nothing about the video.
+ *
+ * @param {string} videoPath - Path to the source video
+ * @param {string} outputPath - Path for the output .mp4
+ * @param {Object} options - { segments, segmentSeconds, width }
+ * @returns {Promise<string>} - Path to the generated preview
+ */
+async function generateHoverPreview(videoPath, outputPath, options = {}) {
+  const {
+    segments = PREVIEW_SEGMENTS,
+    segmentSeconds = PREVIEW_SEGMENT_SECONDS,
+    width = PREVIEW_WIDTH
+  } = options;
+
+  const duration = await getVideoDuration(videoPath);
+  if (!duration || duration <= 0) {
+    throw new Error('Cannot generate preview without a valid duration');
+  }
+
+  // Too short to sample across: just take the opening.
+  const usable = duration < segments * segmentSeconds * 2 ? 1 : segments;
+  const segLength = Math.min(segmentSeconds, duration / (usable + 1));
+
+  const offsets = [];
+  for (let i = 0; i < usable; i++) {
+    offsets.push(usable === 1 ? 0 : (duration * (i + 1)) / (usable + 1));
+  }
+
+  // Open the source once per segment with an input-level seek. Input seeking
+  // jumps straight to the keyframe, so a 10-minute film costs the same as a
+  // 30-second one; a filter-level trim would decode everything up to the last
+  // sample point.
+  const command = ffmpeg();
+  offsets.forEach((start) => {
+    command.input(videoPath).inputOptions([`-ss ${start.toFixed(2)}`]);
+  });
+
+  const parts = offsets.map((_, i) =>
+    `[${i}:v]trim=duration=${segLength.toFixed(2)},` +
+    `setpts=PTS-STARTPTS,scale='min(${width},iw)':-2[v${i}]`
+  );
+  const labels = offsets.map((_, i) => `[v${i}]`).join('');
+  const filter = `${parts.join(';')};${labels}concat=n=${usable}:v=1:a=0[out]`;
+
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+
+  return new Promise((resolve, reject) => {
+    command
+      .complexFilter(filter, 'out')
+      .outputOptions([
+        '-an',                    // muted - previews never carry audio
+        '-c:v', 'libx264',
+        '-profile:v', 'baseline', // widest mobile decoder support
+        '-level', '3.1',
+        '-pix_fmt', 'yuv420p',
+        '-crf', '30',
+        '-preset', 'veryfast',
+        '-r', '24',
+        '-movflags', '+faststart' // start playing before the whole file lands
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        logger.info('Hover preview generated', { videoPath, outputPath, segments: usable });
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        logger.error('Error generating hover preview', { error: err.message, videoPath });
+        reject(err);
+      })
+      .run();
+  });
+}
+
 module.exports = {
   extractVideoMetadata,
   generateVideoThumbnail,
+  generateHoverPreview,
   isValidVideo,
   getVideoDuration,
   processUploadedVideo,

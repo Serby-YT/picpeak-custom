@@ -72,6 +72,7 @@ export interface Photo {
   url: string;
   thumbnail_url?: string;
   hero_url?: string; // Hero-optimized image URL (1920x1080) for full-width hero sections
+  preview_url?: string | null; // Short muted montage played on hover / in view (videos only)
   secure_url_template?: string;
   download_url_template?: string;
   requires_token?: boolean;

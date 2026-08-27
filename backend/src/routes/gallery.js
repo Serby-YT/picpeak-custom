@@ -403,6 +403,13 @@ router.get('/:slug/photos', verifyGalleryAccess, async (req, res) => {
           filename: photo.filename,
           url: photoUrl,
           thumbnail_url: photo.thumbnail_path ? `/api/gallery/${req.params.slug}/thumbnail/${photo.id}${wmQuery}` : null,
+          // Short muted montage for hover / in-view autoplay (videos only)
+          preview_url: photo.preview_path ? `/api/gallery/${req.params.slug}/preview/${photo.id}` : null,
+          // Without these the client cannot tell a video from a photo: `type`
+          // is the collage/individual distinction, not the media kind.
+          media_type: photo.media_type || 'image',
+          mime_type: photo.mime_type || null,
+          duration: photo.duration || null,
           // Hero-optimized image URL (1920x1080) for full-width hero sections
           hero_url: `/api/gallery/${req.params.slug}/hero/${photo.id}${wmQuery}`,
           secure_url_template: `/api/secure-images/${req.params.slug}/secure/${photo.id}/{{token}}`,
@@ -942,6 +949,63 @@ router.get('/:slug/photo/:photoId',
         eventId: req.event?.id
       });
       res.status(500).json({ error: 'Failed to serve photo' });
+    }
+  }
+);
+
+// Serve hover-preview clip: short, muted montage shown on hover / in-view.
+// Videos only, and only if one was generated.
+//
+// Intentionally NOT written to access_logs: a hover is not a view, and logging
+// them would swamp the gallery's real view statistics.
+router.get('/:slug/preview/:photoId',
+  verifyGalleryAccess,
+  async (req, res) => {
+    try {
+      const { photoId } = req.params;
+
+      const photo = await db('photos')
+        .where({ id: photoId, event_id: req.event.id })
+        .first();
+
+      if (!photo || !photo.preview_path) {
+        return res.status(404).json({ error: 'Preview not found' });
+      }
+
+      const storageRoot = getStoragePath();
+      const previewPath = path.resolve(storageRoot, photo.preview_path);
+
+      // Never serve outside the storage root.
+      if (!previewPath.startsWith(path.resolve(storageRoot) + path.sep)) {
+        logger.warn('Rejected preview path outside storage root', { photoId });
+        return res.status(404).json({ error: 'Preview not found' });
+      }
+
+      const fs = require('fs');
+      if (!fs.existsSync(previewPath)) {
+        return res.status(404).json({ error: 'Preview not found' });
+      }
+
+      const stat = fs.statSync(previewPath);
+      const etag = `"preview-${photoId}-${stat.mtime.getTime()}"`;
+
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
+      }
+
+      // Previews are ~30KB, so serve the whole body - no range handling needed.
+      res.set({
+        'Content-Type': 'video/mp4',
+        'Content-Length': stat.size,
+        'Cache-Control': 'private, max-age=86400',
+        'ETag': etag,
+        'X-Content-Type-Options': 'nosniff'
+      });
+
+      fs.createReadStream(previewPath).pipe(res);
+    } catch (error) {
+      logger.error('Error serving hover preview:', { error: error.message });
+      res.status(500).json({ error: 'Failed to serve preview' });
     }
   }
 );

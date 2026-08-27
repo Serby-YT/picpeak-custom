@@ -34,7 +34,7 @@ RUN apk upgrade --no-cache
 RUN npm install -g npm@10
 
 # Install dumb-init for proper signal handling and postgresql-client for database checks
-RUN apk add --no-cache dumb-init postgresql-client
+RUN apk add --no-cache dumb-init postgresql-client ffmpeg
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001

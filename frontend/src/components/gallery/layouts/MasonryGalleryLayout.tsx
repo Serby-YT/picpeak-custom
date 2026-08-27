@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Download, Maximize2, Check, MessageSquare, Star, Heart } from 'lucide-react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { AuthenticatedImage } from '../../common';
+import { GalleryHoverPreview } from '../GalleryHoverPreview';
 import { FeedbackIdentityModal } from '../../gallery/FeedbackIdentityModal';
 import { feedbackService } from '../../../services/feedback.service';
 import {
@@ -89,6 +90,8 @@ const MasonryPhoto: React.FC<MasonryPhotoProps> = ({
         isGallery={true}
         protectFromDownload={!allowDownloads}
       />
+
+      <GalleryHoverPreview photo={photo} />
       
       {/* Feedback Indicators */}
       {feedbackEnabled && ((photo.comment_count ?? 0) > 0 || (photo.average_rating ?? 0) > 0 || (photo.like_count ?? 0) > 0) && (
@@ -429,6 +432,8 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
                 protectFromDownload={!allowDownloads}
               />
 
+              <GalleryHoverPreview photo={photo} />
+
               {/* Feedback Indicators */}
               {feedbackEnabled && ((photo.comment_count ?? 0) > 0 || (photo.average_rating ?? 0) > 0 || (photo.like_count ?? 0) > 0) && (
                 <div className="absolute top-2 left-2 flex gap-1 z-10">
@@ -544,6 +549,8 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
                 isGallery={true}
                 protectFromDownload={!allowDownloads}
               />
+
+              <GalleryHoverPreview photo={photo} />
 
               {/* Feedback Indicators */}
               {feedbackEnabled && ((photo.comment_count ?? 0) > 0 || (photo.average_rating ?? 0) > 0 || (photo.like_count ?? 0) > 0) && (
@@ -669,6 +676,8 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
                 isGallery={true}
                 protectFromDownload={!allowDownloads}
               />
+
+              <GalleryHoverPreview photo={photo} />
 
               {/* Feedback Indicators */}
               {feedbackEnabled && ((photo.comment_count ?? 0) > 0 || (photo.average_rating ?? 0) > 0 || (photo.like_count ?? 0) > 0) && (

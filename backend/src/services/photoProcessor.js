@@ -3,7 +3,7 @@ const fs = require('fs').promises;
 const { db } = require('../database/db');
 const { generateThumbnail } = require('./imageProcessor');
 const { generatePhotoFilename } = require('../utils/filenameSanitizer');
-const { processUploadedVideo, isVideoMimeType } = require('./videoProcessor');
+const { processUploadedVideo, generateHoverPreview, isVideoMimeType } = require('./videoProcessor');
 
 // Get storage path from environment or default
 const getStoragePath = () => process.env.STORAGE_PATH || path.join(__dirname, '../../../storage');
@@ -157,6 +157,7 @@ async function processUploadedPhotos(files, eventId, uploadedBy = 'admin', categ
 
       // Generate thumbnail and extract metadata
       let thumbnailPath;
+      let previewPath = null;
       let videoMetadata = null;
       let imageMetadata = null;
 
@@ -169,6 +170,19 @@ async function processUploadedPhotos(files, eventId, uploadedBy = 'admin', categ
         const result = await processUploadedVideo(newPath, videoThumbnailPath);
         videoMetadata = result.metadata;
         thumbnailPath = path.relative(getStoragePath(), videoThumbnailPath);
+
+        // Hover preview. Best-effort: a video without one simply shows its
+        // static thumbnail, so a failure here must not fail the upload.
+        try {
+          const hoverPreviewPath = path.join(
+            thumbnailDir,
+            `preview_${newFilename.replace(/\.[^.]+$/, '.mp4')}`
+          );
+          await generateHoverPreview(newPath, hoverPreviewPath);
+          previewPath = path.relative(getStoragePath(), hoverPreviewPath);
+        } catch (previewError) {
+          console.warn(`Could not generate hover preview for ${file.originalname}:`, previewError.message);
+        }
       } else {
         // Process image: generate thumbnail and extract dimensions
         thumbnailPath = await generateThumbnail(newPath);
@@ -219,6 +233,10 @@ async function processUploadedPhotos(files, eventId, uploadedBy = 'admin', categ
         photoData.audio_codec = videoMetadata.audioCodec;
         photoData.width = videoMetadata.width;
         photoData.height = videoMetadata.height;
+      }
+
+      if (isVideo && previewPath) {
+        photoData.preview_path = previewPath;
       }
 
       // Add image dimensions if available

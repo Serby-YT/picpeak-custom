@@ -4,6 +4,7 @@ import { useInView } from 'react-intersection-observer';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { AuthenticatedImage } from '../../common';
+import { GalleryHoverPreview } from '../GalleryHoverPreview';
 import { FeedbackIdentityModal } from '../../gallery/FeedbackIdentityModal';
 import { feedbackService } from '../../../services/feedback.service';
 import type { BaseGalleryLayoutProps } from './BaseGalleryLayout';
@@ -212,6 +213,8 @@ const GridPhoto: React.FC<GridPhotoProps> = ({
             }}
           />
           
+          <GalleryHoverPreview photo={photo} />
+
           <div className={`absolute inset-0 bg-black/40 transition-opacity duration-200 rounded-lg flex items-center justify-center gap-2 ${overlayVisibilityClass} md:group-hover:opacity-100`}>
             {!isSelectionMode && (
               <>
