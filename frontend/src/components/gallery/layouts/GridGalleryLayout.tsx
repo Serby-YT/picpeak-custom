@@ -1,10 +1,10 @@
 import React from 'react';
-import { Download, Maximize2, Check, MessageSquare, Star, Heart, Video } from 'lucide-react';
+import { Download, Maximize2, Check, MessageSquare, Star, Heart } from 'lucide-react';
 import { useInView } from 'react-intersection-observer';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { AuthenticatedImage } from '../../common';
-import { GalleryHoverPreview } from '../GalleryHoverPreview';
+import { VideoTileOverlay } from '../VideoTileOverlay';
 import { FeedbackIdentityModal } from '../../gallery/FeedbackIdentityModal';
 import { feedbackService } from '../../../services/feedback.service';
 import type { BaseGalleryLayoutProps } from './BaseGalleryLayout';
@@ -160,10 +160,6 @@ const GridPhoto: React.FC<GridPhotoProps> = ({
       ? 'opacity-100 md:opacity-100'
       : 'opacity-0 md:opacity-0';
 
-  const isVideo = (photo.media_type === 'video') ||
-    (photo.mime_type && photo.mime_type.startsWith('video/')) ||
-    photo.type === 'video';
-
   const handlePhotoClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isTouchDevice && !overlayVisible && !isSelectionMode) {
       e.preventDefault();
@@ -213,7 +209,7 @@ const GridPhoto: React.FC<GridPhotoProps> = ({
             }}
           />
           
-          <GalleryHoverPreview photo={photo} />
+          <VideoTileOverlay photo={photo} />
 
           <div className={`absolute inset-0 bg-black/40 transition-opacity duration-200 rounded-lg flex items-center justify-center gap-2 ${overlayVisibilityClass} md:group-hover:opacity-100`}>
             {!isSelectionMode && (
@@ -329,14 +325,6 @@ const GridPhoto: React.FC<GridPhotoProps> = ({
             </div>
           )}
 
-          {isVideo && (
-            <div className="absolute bottom-2 right-2">
-              <span className="px-2 py-1 bg-black/60 text-white text-xs rounded flex items-center gap-1">
-                <Video className="w-3 h-3" />
-                {t('common.video', 'Video')}
-              </span>
-            </div>
-          )}
 
           {photo.type === 'collage' && (
             <div className="absolute bottom-2 right-2">

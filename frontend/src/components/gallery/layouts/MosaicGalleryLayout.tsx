@@ -1,6 +1,7 @@
 import React from 'react';
 import { Download, Maximize2, Check, Heart, MessageSquare } from 'lucide-react';
 import { AuthenticatedImage } from '../../common';
+import { VideoTileOverlay } from '../VideoTileOverlay';
 import { FeedbackIdentityModal } from '../../gallery/FeedbackIdentityModal';
 import { feedbackService } from '../../../services/feedback.service';
 import type { BaseGalleryLayoutProps } from './BaseGalleryLayout';
@@ -79,6 +80,8 @@ const MosaicPhoto: React.FC<MosaicPhotoProps> = ({
           isGallery={true}
           protectFromDownload={!allowDownloads}
         />
+
+        <VideoTileOverlay photo={photo} />
 
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
           {!isSelectionMode && (

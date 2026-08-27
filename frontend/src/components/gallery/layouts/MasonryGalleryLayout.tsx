@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Download, Maximize2, Check, MessageSquare, Star, Heart } from 'lucide-react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { AuthenticatedImage } from '../../common';
-import { GalleryHoverPreview } from '../GalleryHoverPreview';
+import { VideoTileOverlay } from '../VideoTileOverlay';
 import { FeedbackIdentityModal } from '../../gallery/FeedbackIdentityModal';
 import { feedbackService } from '../../../services/feedback.service';
 import {
@@ -91,7 +91,7 @@ const MasonryPhoto: React.FC<MasonryPhotoProps> = ({
         protectFromDownload={!allowDownloads}
       />
 
-      <GalleryHoverPreview photo={photo} />
+      <VideoTileOverlay photo={photo} />
       
       {/* Feedback Indicators */}
       {feedbackEnabled && ((photo.comment_count ?? 0) > 0 || (photo.average_rating ?? 0) > 0 || (photo.like_count ?? 0) > 0) && (
@@ -432,7 +432,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
                 protectFromDownload={!allowDownloads}
               />
 
-              <GalleryHoverPreview photo={photo} />
+              <VideoTileOverlay photo={photo} />
 
               {/* Feedback Indicators */}
               {feedbackEnabled && ((photo.comment_count ?? 0) > 0 || (photo.average_rating ?? 0) > 0 || (photo.like_count ?? 0) > 0) && (
@@ -550,7 +550,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
                 protectFromDownload={!allowDownloads}
               />
 
-              <GalleryHoverPreview photo={photo} />
+              <VideoTileOverlay photo={photo} />
 
               {/* Feedback Indicators */}
               {feedbackEnabled && ((photo.comment_count ?? 0) > 0 || (photo.average_rating ?? 0) > 0 || (photo.like_count ?? 0) > 0) && (
@@ -677,7 +677,7 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
                 protectFromDownload={!allowDownloads}
               />
 
-              <GalleryHoverPreview photo={photo} />
+              <VideoTileOverlay photo={photo} />
 
               {/* Feedback Indicators */}
               {feedbackEnabled && ((photo.comment_count ?? 0) > 0 || (photo.average_rating ?? 0) > 0 || (photo.like_count ?? 0) > 0) && (

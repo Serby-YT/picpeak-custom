@@ -3,6 +3,7 @@ import { Download, Maximize2, Check, Calendar, Heart, MessageSquare } from 'luci
 import { format, parseISO, startOfDay, startOfWeek, startOfMonth } from 'date-fns';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { AuthenticatedImage } from '../../common';
+import { VideoTileOverlay } from '../VideoTileOverlay';
 import type { BaseGalleryLayoutProps } from './BaseGalleryLayout';
 import type { Photo } from '../../../types';
 import { FeedbackIdentityModal } from '../../gallery/FeedbackIdentityModal';
@@ -111,6 +112,8 @@ export const TimelineGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
                       isGallery={true}
                       protectFromDownload={!allowDownloads}
                     />
+
+                    <VideoTileOverlay photo={photo} />
                     
                     {/* Time label */}
                     <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded">

@@ -92,36 +92,65 @@ async function extractVideoMetadata(videoPath) {
   });
 }
 
+// Thumbnails keep the source aspect ratio; 600px wide suits the large tiles a
+// video gets in a masonry gallery.
+const THUMBNAIL_WIDTH = 600;
+
 /**
- * Generate thumbnail from video
+ * Generate a poster frame for a video.
+ *
  * @param {string} videoPath - Path to the video file
  * @param {string} outputPath - Path for the output thumbnail
- * @param {Object} options - Thumbnail options
+ * @param {Object} options - { timeOffset, width, quality }
  * @returns {Promise<string>} - Path to generated thumbnail
  */
 async function generateVideoThumbnail(videoPath, outputPath, options = {}) {
   const {
-    timeOffset = '00:00:01', // Take screenshot at 1 second
-    size = '300x300',
-    quality = 2 // 1-31, lower is better quality
+    timeOffset = null,
+    width = THUMBNAIL_WIDTH,
+    quality = 2 // mjpeg scale, 1-31, lower is better
   } = options;
+
+  // Pick a frame worth showing. The opening second of an edited film is
+  // usually black, a fade-in or a title card, so sample a little way in and
+  // let ffmpeg's `thumbnail` filter choose the most representative frame from
+  // the batch that follows.
+  let seek = timeOffset;
+  if (seek === null) {
+    let duration = 0;
+    try {
+      duration = await getVideoDuration(videoPath);
+    } catch (err) {
+      duration = 0;
+    }
+    seek = duration > 12 ? duration * 0.1 : Math.max(0, Math.min(1, duration / 3));
+  }
+
+  const seekArg = typeof seek === 'number' ? seek.toFixed(2) : seek;
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
   return new Promise((resolve, reject) => {
     ffmpeg(videoPath)
-      .screenshots({
-        timestamps: [timeOffset],
-        filename: path.basename(outputPath),
-        folder: path.dirname(outputPath),
-        size: size
-      })
+      .inputOptions([`-ss ${seekArg}`])
+      .outputOptions([
+        '-frames:v', '1',
+        // scale preserves the source aspect. Forcing a square (the old
+        // `size: '300x300'`) squashed every 16:9 frame, so the still did not
+        // match the clip that plays over it on hover.
+        '-vf', `thumbnail,scale='min(${width},iw)':-2`,
+        '-q:v', String(quality),
+        '-an'
+      ])
+      .output(outputPath)
       .on('end', () => {
-        logger.info('Video thumbnail generated', { videoPath, outputPath });
+        logger.info('Video thumbnail generated', { videoPath, outputPath, seek: seekArg });
         resolve(outputPath);
       })
       .on('error', (err) => {
         logger.error('Error generating video thumbnail', { error: err.message, videoPath });
         reject(err);
-      });
+      })
+      .run();
   });
 }
 

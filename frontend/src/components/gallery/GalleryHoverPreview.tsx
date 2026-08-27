@@ -11,6 +11,8 @@ import type { Photo } from '../../types';
 
 interface GalleryHoverPreviewProps {
   photo: Photo;
+  /** Lets the tile hide its play glyph while the preview is running. */
+  onPlayingChange?: (playing: boolean) => void;
 }
 
 const VISIBILITY_THRESHOLDS = [0, 0.25, 0.5, 0.6, 0.75, 1];
@@ -36,7 +38,7 @@ function isVideoPhoto(photo: Photo): boolean {
  * Renders nothing at all for photos, for videos without a generated preview,
  * and for visitors who asked for reduced motion or data saving.
  */
-export const GalleryHoverPreview: React.FC<GalleryHoverPreviewProps> = ({ photo }) => {
+export const GalleryHoverPreview: React.FC<GalleryHoverPreviewProps> = ({ photo, onPlayingChange }) => {
   const previewsEnabled = useVideoPreviewsEnabled();
   const enabled = previewsEnabled && isVideoPhoto(photo) && Boolean(photo.preview_url);
 
@@ -47,6 +49,14 @@ export const GalleryHoverPreview: React.FC<GalleryHoverPreviewProps> = ({ photo 
   const [isTouchDevice, setIsTouchDevice] = React.useState(false);
   const [playing, setPlaying] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
+
+  const reportPlaying = React.useCallback(
+    (value: boolean) => {
+      setPlaying(value);
+      onPlayingChange?.(value);
+    },
+    [onPlayingChange]
+  );
 
   const activePreviewId = React.useSyncExternalStore(
     subscribeToActivePreview,
@@ -123,9 +133,9 @@ export const GalleryHoverPreview: React.FC<GalleryHoverPreviewProps> = ({ photo 
     } else {
       video.pause();
       if (video.currentTime !== 0) video.currentTime = 0;
-      setPlaying(false);
+      reportPlaying(false);
     }
-  }, [active]);
+  }, [active, reportPlaying]);
 
   if (!enabled) return null;
 
@@ -141,7 +151,7 @@ export const GalleryHoverPreview: React.FC<GalleryHoverPreviewProps> = ({ photo 
           preload="none"
           aria-hidden="true"
           tabIndex={-1}
-          onPlaying={() => setPlaying(true)}
+          onPlaying={() => reportPlaying(true)}
           onError={() => setFailed(true)}
           className={[
             'absolute inset-0 w-full h-full object-cover pointer-events-none',
