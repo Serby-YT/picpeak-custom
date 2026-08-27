@@ -121,22 +121,48 @@ class PhotosService {
     return response.data;
   }
 
+  // A chunk is 10MB. Even on a slow domestic uplink that should not take
+  // minutes, so cap it: without a timeout a stalled connection hangs the whole
+  // upload silently and the progress bar simply stops.
+  private CHUNK_TIMEOUT_MS = 180000;
+  private CHUNK_RETRIES = 3;
+
   async uploadChunk(
     eventId: number,
     uploadId: string,
     chunkIndex: number,
-    chunkData: Blob
+    chunkData: Blob,
+    onBytes?: (fraction: number) => void
   ): Promise<{ progress: number; complete: boolean }> {
-    const response = await api.post(
-      `/admin/photos/${eventId}/chunked-upload/${uploadId}/chunk/${chunkIndex}`,
-      chunkData,
-      {
-        headers: {
-          'Content-Type': 'application/octet-stream'
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= this.CHUNK_RETRIES; attempt++) {
+      try {
+        const response = await api.post(
+          `/admin/photos/${eventId}/chunked-upload/${uploadId}/chunk/${chunkIndex}`,
+          chunkData,
+          {
+            headers: {
+              'Content-Type': 'application/octet-stream'
+            },
+            timeout: this.CHUNK_TIMEOUT_MS,
+            onUploadProgress: (e) => {
+              if (onBytes && e.total) onBytes(e.loaded / e.total);
+            }
+          }
+        );
+        return response.data;
+      } catch (error) {
+        lastError = error;
+        console.warn(`Chunk ${chunkIndex} attempt ${attempt}/${this.CHUNK_RETRIES} failed`, error);
+        if (attempt < this.CHUNK_RETRIES) {
+          // brief backoff before retrying the same chunk
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
       }
-    );
-    return response.data;
+    }
+
+    throw lastError;
   }
 
   async completeChunkedUpload(
@@ -176,10 +202,16 @@ class PhotosService {
         const end = Math.min(start + this.CHUNK_SIZE, file.size);
         const chunk = file.slice(start, end);
 
-        const result = await this.uploadChunk(eventId, uploadId, i, chunk);
+        // Report progress within the chunk too, otherwise the bar sits still
+        // for the whole of a 10MB transfer and looks frozen.
+        await this.uploadChunk(eventId, uploadId, i, chunk, (fraction) => {
+          if (onProgress) {
+            onProgress(Math.round(((i + fraction) / expectedChunks) * 100));
+          }
+        });
 
         if (onProgress) {
-          onProgress(result.progress);
+          onProgress(Math.round(((i + 1) / expectedChunks) * 100));
         }
       }
 
