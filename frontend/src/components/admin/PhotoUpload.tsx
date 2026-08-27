@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import { useQuery } from '@tanstack/react-query';
 import { categoriesService } from '../../services/categories.service';
 import { settingsService } from '../../services/settings.service';
+import { photosService } from '../../services/photos.service';
 import { useTranslation } from 'react-i18next';
 import { extensionsToMimeTypes, extensionsToAcceptString } from '../../utils/fileTypes';
 
@@ -110,12 +111,19 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ eventId, onUploadCompl
     // For large uploads, chunk the files by both count AND size to prevent memory/network issues
     const MAX_FILES_PER_CHUNK = Math.max(1, Math.min(50, maxFilesPerUpload)); // Max 50 files per chunk
     const MAX_BYTES_PER_CHUNK = 80 * 1024 * 1024; // Max 80MB per chunk (Cloudflare proxy caps request bodies at 100MB)
+
+    // Batching files together cannot help a file that is itself too big: it
+    // would still travel as one request and the proxy would refuse it. Those go
+    // up through the chunked endpoint instead, 10MB at a time.
+    const oversizedFiles = selectedFiles.filter((f) => photosService.shouldUseChunkedUpload(f.size));
+    const batchableFiles = selectedFiles.filter((f) => !photosService.shouldUseChunkedUpload(f.size));
+
     const chunks: File[][] = [];
 
     let currentChunk: File[] = [];
     let currentChunkSize = 0;
 
-    for (const file of selectedFiles) {
+    for (const file of batchableFiles) {
       // Start a new chunk if adding this file would exceed limits
       if (currentChunk.length >= MAX_FILES_PER_CHUNK ||
           (currentChunkSize + file.size > MAX_BYTES_PER_CHUNK && currentChunk.length > 0)) {
@@ -133,13 +141,15 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ eventId, onUploadCompl
       chunks.push(currentChunk);
     }
 
-    setTotalChunks(chunks.length);
+    const totalUnits = chunks.length + oversizedFiles.length;
+    setTotalChunks(totalUnits);
+    let unitIndex = 0;
     let totalUploaded = 0;
-    let failedFiles = [];
+    let failedFiles: string[] = [];
 
     try {
       for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        setCurrentChunk(chunkIndex + 1);
+        setCurrentChunk(unitIndex + 1);
         const chunk = chunks[chunkIndex];
         const formData = new FormData();
         
@@ -157,7 +167,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ eventId, onUploadCompl
               if (progressEvent.total) {
                 // Calculate overall progress across all chunks
                 const chunkProgress = progressEvent.loaded / progressEvent.total;
-                const overallProgress = ((chunkIndex + chunkProgress) / chunks.length) * 100;
+                const overallProgress = ((unitIndex + chunkProgress) / totalUnits) * 100;
                 setUploadProgress(Math.round(overallProgress));
               }
             },
@@ -167,10 +177,29 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ eventId, onUploadCompl
         } catch (error: any) {
           console.error(`Error uploading chunk ${chunkIndex + 1}:`, error);
           failedFiles.push(...chunk.map(f => f.name));
-          
-          // Continue with next chunk even if one fails
-          continue;
         }
+        unitIndex++;
+      }
+
+      // Oversized files, one at a time, in 10MB pieces.
+      for (const file of oversizedFiles) {
+        setCurrentChunk(unitIndex + 1);
+        try {
+          await photosService.uploadLargeFile(
+            eventId,
+            file,
+            selectedCategoryId,
+            (fileProgress) => {
+              const overallProgress = ((unitIndex + fileProgress / 100) / totalUnits) * 100;
+              setUploadProgress(Math.round(overallProgress));
+            }
+          );
+          totalUploaded += 1;
+        } catch (error: any) {
+          console.error(`Error uploading large file ${file.name}:`, error);
+          failedFiles.push(file.name);
+        }
+        unitIndex++;
       }
 
       // Clear selected files
@@ -184,8 +213,8 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ eventId, onUploadCompl
         toast.success(t('upload.uploadComplete') || `Successfully uploaded ${totalUploaded} files`);
       } else {
         toast.warning(
-          t('upload.someFilesFailed') || 
-          `Uploaded ${totalUploaded} files. ${failedFiles.length} files failed.`
+          `Uploaded ${totalUploaded}. Failed: ${failedFiles.join(', ')}`,
+          { autoClose: false }
         );
       }
       

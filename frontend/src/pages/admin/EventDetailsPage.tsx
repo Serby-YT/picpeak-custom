@@ -1717,7 +1717,9 @@ export const EventDetailsPage: React.FC = () => {
             onUploadComplete={() => {
               queryClient.invalidateQueries({ queryKey: ['admin-event', id] });
               queryClient.invalidateQueries({ queryKey: ['admin-event-photos', id] });
-              toast.success(t('toast.uploadSuccess'));
+              // No toast here: PhotoUpload already reports the real outcome, and
+              // this one fired even when files had failed, so a partly failed
+              // upload showed "success" and "some files failed" side by side.
               refetchPhotos();
             }}
           />

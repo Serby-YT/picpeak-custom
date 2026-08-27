@@ -197,9 +197,12 @@ class PhotosService {
     }
   }
 
-  // Check if file should use chunked upload (> 100MB)
+  // Anything near the proxy ceiling must go up in chunks. The threshold sits at
+  // 80MB rather than 100MB because the Cloudflare proxy in front of the gallery
+  // rejects request bodies over 100MB, and multipart framing adds to the file's
+  // own size - a 99MB file sent whole would still be refused.
   shouldUseChunkedUpload(fileSize: number): boolean {
-    return fileSize > 100 * 1024 * 1024; // 100MB threshold
+    return fileSize > 80 * 1024 * 1024;
   }
 
   // ============================================
