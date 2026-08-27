@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedDate } from '../../hooks/useLocalizedDate';
@@ -39,7 +39,6 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
   eventName,
   eventLogo,
   eventDate,
-  expiresAt,
   heroPhotoOverride,
   dividerStyle = 'wave',
   allowDownloads = true,
@@ -103,7 +102,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
   return (
     <div className="relative">
       {/* Hero Section */}
-      <div className="relative left-1/2 -translate-x-1/2 w-screen aspect-video sm:aspect-auto sm:h-screen mb-8">
+      <div className="relative left-1/2 -translate-x-1/2 w-screen h-[68svh] min-h-[380px] sm:h-screen sm:min-h-0 mb-4 sm:mb-6">
         <AuthenticatedImage
           src={heroPhoto.hero_url || heroPhoto.url}
           fallbackSrc={heroPhoto.url}
@@ -119,10 +118,19 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
           useCanvasRendering={useCanvasRendering || protectionLevel === 'maximum'}
         />
 
-        {/* Overlay */}
+        {/* Overlay: flat dim (user-controlled) kept light, plus a gradient
+            scrim concentrated behind the title so contrast does not depend on
+            how bright this particular photograph happens to be. */}
         <div
-          className="absolute inset-0 bg-black"
+          className="absolute inset-0 bg-black pointer-events-none"
           style={{ opacity: overlayOpacity }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse 90% 55% at 50% 55%, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.18) 45%, rgba(0,0,0,0) 75%)'
+          }}
         />
 
         {/* Hero Content */}
@@ -130,24 +138,19 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
           <div className="text-center px-4 sm:px-10 lg:px-14">
             {/* Event Title */}
             {eventName && (
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl xl:text-6xl font-semibold text-white drop-shadow-lg mb-2 sm:mb-3">
+              <h1 className="gallery-hero-title text-[clamp(1.75rem,7vw,4rem)] font-semibold text-white drop-shadow-lg mb-2 sm:mb-3 leading-[1.05]">
                 {eventName}
               </h1>
             )}
 
-            {/* Event Dates */}
-            {(eventDate || expiresAt) && (
+            {/* Event date only. The expiry is stated once, by the banner - it
+                does not belong under the couple's names as well. */}
+            {eventDate && (
               <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-6 text-white/90">
                 {eventDate && (
                   <span className="flex items-center text-xs sm:text-xl">
                     <Calendar className="w-3.5 h-3.5 sm:w-6 sm:h-6 mr-1.5 sm:mr-2" />
                     {format(parseISO(eventDate), 'PP')}
-                  </span>
-                )}
-                {expiresAt && (
-                  <span className="flex items-center text-xs sm:text-xl">
-                    <Clock className="w-3.5 h-3.5 sm:w-6 sm:h-6 mr-1.5 sm:mr-2" />
-                    {t('gallery.expires')} {format(parseISO(expiresAt), 'PP')}
                   </span>
                 )}
               </div>

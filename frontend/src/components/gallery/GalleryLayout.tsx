@@ -128,7 +128,7 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
   const heroLogoSize = getLogoDimensions('hero');
   
   return (
-    <div className="gallery-page min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
+    <div className="gallery-page relative min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
       {/* Dynamic Favicon */}
       <DynamicFavicon />
 
