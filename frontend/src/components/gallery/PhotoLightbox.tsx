@@ -363,7 +363,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       {/* Close button */}
       <button
         onClick={onClose}
-        className="absolute top-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-30"
+        className="absolute top-4 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.35)] rounded-full transition-colors z-30"
         aria-label="Close"
         style={{ right: isDesktopFeedback ? `${desktopFeedbackWidth + 16}px` : '1rem' }}
       >
@@ -373,7 +373,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       {/* Navigation buttons */}
       <button
         onClick={goToPrevious}
-        className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-20"
+        className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.35)] rounded-full transition-colors z-20"
         aria-label="Previous photo"
       >
         <ChevronLeft className="w-6 h-6 text-white" />
@@ -382,7 +382,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       {!showFeedback || !isSmallScreen ? (
         <button
           onClick={goToNext}
-          className="absolute top-1/2 -translate-y-1/2 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-30"
+          className="absolute top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.35)] rounded-full transition-colors z-30"
           aria-label="Next photo"
           style={{ right: isDesktopFeedback ? `${desktopFeedbackWidth + 16}px` : '1rem' }}
         >
@@ -398,7 +398,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="text-white">
             <p className="text-sm opacity-75">
-              {currentIndex + 1} / {photos.length}
+              <span className="px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10 tabular-nums">{currentIndex + 1} / {photos.length}</span>
             </p>
           </div>
           
@@ -406,7 +406,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             <button
               onClick={handleZoomOut}
               disabled={zoom <= 1}
-              className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.35)] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Zoom out"
             >
               <ZoomOut className="w-5 h-5 text-white" />
@@ -414,7 +414,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             <button
               onClick={handleZoomIn}
               disabled={zoom >= 3}
-              className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.35)] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Zoom in"
             >
               <ZoomIn className="w-5 h-5 text-white" />
@@ -423,7 +423,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             {photos.length > 1 && (isPlaying || currentPhoto.media_type !== 'video') && (
               <button
                 onClick={() => setIsPlaying((prev) => !prev)}
-                className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                className="p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.35)] rounded-full transition-colors"
                 aria-label={isPlaying ? 'Pause slideshow' : 'Play slideshow'}
                 title={isPlaying ? 'Pause slideshow' : 'Play slideshow'}
               >
@@ -440,7 +440,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             {allowDownloads && (
               <button
                 onClick={handleDownload}
-                className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                className="p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.35)] rounded-full transition-colors"
                 aria-label="Download photo"
               >
                 <Download className="w-5 h-5 text-white" />
@@ -452,7 +452,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
               <div className="flex items-center gap-1">
                 <button
                   onClick={submitLike}
-                  className={`p-2 rounded-full transition-colors ${myLiked ? 'bg-red-500/80 hover:bg-red-500' : 'bg-white/10 hover:bg-white/20'}`}
+                  className={`p-2 rounded-full transition-colors ${myLiked ? 'bg-red-500/80 hover:bg-red-500' : 'bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.35)]'}`}
                   aria-label={myLiked ? 'Unlike photo' : 'Like photo'}
                   title={myLiked ? 'Unlike' : 'Like'}
                 >

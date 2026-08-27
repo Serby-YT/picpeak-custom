@@ -453,3 +453,38 @@
     margin-top: 0;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Gallery tiles: response to touch
+   -------------------------------------------------------------------------
+   The tiles only reacted to hover, which does not exist on a phone - where
+   most clients open these galleries. So a tap produced no acknowledgement
+   until the lightbox finished opening. Give the press itself an immediate,
+   compositor-only response.
+
+   `transition: all` was also in play on these cards; restricting it to
+   transform keeps the work on the compositor and stops unrelated property
+   changes from animating.                                                    */
+.photo-card {
+  transition: transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+
+.photo-card:active {
+  transform: scale(0.985);
+  transition-duration: 90ms;
+}
+
+/* The lightbox image should settle rather than snap when it changes. */
+.gallery-page img,
+.photo-card img {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-card,
+  .photo-card:active {
+    transition: none;
+    transform: none;
+  }
+}
