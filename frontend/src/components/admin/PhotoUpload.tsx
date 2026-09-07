@@ -168,31 +168,81 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ eventId, onUploadCompl
       setCurrentChunk(Math.min(completedUnits + 1, totalUnits));
     };
 
+    // A stalled connection is the failure mode here, not a slow one: the phone
+    // drops the stream, no more bytes are acknowledged, and without a deadline
+    // the POST hangs forever with the bar parked just short of 100%. A flat
+    // timeout would punish a legitimately slow hotspot, so watch for bytes
+    // actually stopping instead.
+    const CHUNK_RETRIES = 3;
+    const STALL_TIMEOUT_MS = 90000;
+
     const uploadChunk = async (chunk: File[], unitIndex: number) => {
-      const formData = new FormData();
+      for (let attempt = 1; attempt <= CHUNK_RETRIES; attempt++) {
+        const formData = new FormData();
 
-      chunk.forEach((file) => {
-        formData.append('photos', file);
-      });
-
-      if (selectedCategoryId) {
-        formData.append('category_id', selectedCategoryId.toString());
-      }
-
-      try {
-        await api.post(`/admin/events/${eventId}/upload`, formData, {
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.total) {
-              unitProgress[unitIndex] = progressEvent.loaded / progressEvent.total;
-              publishProgress();
-            }
-          },
+        chunk.forEach((file) => {
+          formData.append("photos", file);
         });
 
-        totalUploaded += chunk.length;
-      } catch (error: any) {
-        console.error(`Error uploading chunk ${unitIndex + 1}:`, error);
-        failedFiles.push(...chunk.map(f => f.name));
+        if (selectedCategoryId) {
+          formData.append("category_id", selectedCategoryId.toString());
+        }
+
+        const controller = new AbortController();
+        let lastProgressAt = Date.now();
+        let allBytesSent = false;
+        const watchdog = setInterval(() => {
+          if (Date.now() - lastProgressAt > STALL_TIMEOUT_MS) {
+            controller.abort();
+          }
+        }, 5000);
+
+        try {
+          await api.post(`/admin/events/${eventId}/upload`, formData, {
+            signal: controller.signal,
+            onUploadProgress: (progressEvent) => {
+              lastProgressAt = Date.now();
+              if (progressEvent.total) {
+                const fraction = progressEvent.loaded / progressEvent.total;
+                unitProgress[unitIndex] = fraction;
+                publishProgress();
+
+                // Every byte is out and the server is now writing them and
+                // replying. Stop watching: aborting now would kill a request
+                // the server may already have accepted, and the retry would
+                // upload the same photos a second time.
+                if (fraction >= 1 && !allBytesSent) {
+                  allBytesSent = true;
+                  clearInterval(watchdog);
+                }
+              }
+            },
+          });
+
+          clearInterval(watchdog);
+          totalUploaded += chunk.length;
+          break;
+        } catch (error: any) {
+          clearInterval(watchdog);
+          console.warn(`Chunk ${unitIndex + 1} attempt ${attempt}/${CHUNK_RETRIES} failed`, error);
+
+          // Only a chunk that died mid-transfer is safe to send again. Once the
+          // bytes were all delivered the server may have stored them, so a
+          // retry risks duplicating the photos — report it and move on.
+          const safeToRetry = !allBytesSent && attempt < CHUNK_RETRIES;
+
+          if (safeToRetry) {
+            // The retry re-sends the whole chunk, so give back the progress
+            // this attempt had claimed.
+            unitProgress[unitIndex] = 0;
+            publishProgress();
+            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+
+          failedFiles.push(...chunk.map((f) => f.name));
+          break;
+        }
       }
 
       unitProgress[unitIndex] = 1;
