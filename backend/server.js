@@ -585,8 +585,12 @@ app.get('/gallery/:slug', async (req, res, next) => {
     const baseUrl = (process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
     const pageUrl = `${baseUrl}/gallery/${slug}`;
     const imageUrl = `${baseUrl}/api/gallery/${slug}/preview-image`;
-    const title = `${event.event_name} - Photo Gallery`;
-    const description = `View and download photos from ${event.event_name}`;
+    // Romanian: every client these links go to is Romanian, and the preview is
+    // the first thing they see. Hardcoded rather than driven by events.language
+    // because that column and the global default are both still en on this
+    // deployment, so reading them would just put English back.
+    const title = `${event.event_name} - Galerie foto`;
+    const description = `Vezi și descarcă fotografiile din galeria ${event.event_name}`;
 
     const html = await getSpaShell();
     const metaTags = `
