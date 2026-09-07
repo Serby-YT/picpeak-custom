@@ -69,15 +69,13 @@ export const useDownloadAllPhotos = () => {
   return useMutation({
     mutationFn: (slug: string) => galleryService.downloadAllPhotos(slug),
     onMutate: () => {
-      // The zip is generated and streamed live, then fetched in full before
-      // the browser can save it — large galleries can take several minutes
-      // with no visible progress in between, so set expectations up front.
-      toast.info('Preparing your download — large galleries can take several minutes. Please keep this tab open.', {
+      // The browser now downloads this itself, so the only thing we know is
+      // that it has been handed over. The zip is built and streamed as it is
+      // requested, so a large gallery takes a while before the file appears in
+      // the download list — say so, rather than looking like nothing happened.
+      toast.info('Preparing your download — a large gallery can take a few minutes to start. It will appear in your downloads.', {
         autoClose: 8000,
       });
-    },
-    onSuccess: () => {
-      toast.success('Download complete!');
     },
     onError: () => {
       toast.error('Failed to download photos');

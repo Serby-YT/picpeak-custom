@@ -1,6 +1,7 @@
 import { api } from '../config/api';
 import type { GalleryInfo, GalleryData, GalleryStats, ResolvedGalleryIdentifier } from '../types';
 import { normalizeRequirePassword } from '../utils/accessControl';
+import { buildResourceUrl } from '../utils/url';
 
 export const galleryService = {
   // Verify share token
@@ -83,19 +84,29 @@ export const galleryService = {
 
   // Download all photos as ZIP
   async downloadAllPhotos(slug: string): Promise<void> {
-    const response = await api.get(`/gallery/${slug}/download-all`, {
-      responseType: 'blob',
-    });
-
-    // Create download link
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+    // Hand the URL to the browser rather than buffering the archive ourselves.
+    //
+    // This used to fetch the whole zip with responseType: 'blob' and save it
+    // from an object URL, which fails on a phone in two different ways. iOS
+    // Safari has a per-tab memory ceiling far below the size of a real gallery,
+    // so a ~500MB archive never completes at all. And the Blob was built with
+    // no MIME type, so Android's download manager could not confirm the bytes
+    // matched the .zip name and appended .txt to it.
+    //
+    // A direct request streams to disk with no ceiling, and the server's own
+    // Content-Type and Content-Disposition decide the type and the filename.
+    // The gallery token rides along as a SameSite=Lax cookie, which is sent on
+    // a top-level request like this one, so it stays authenticated without the
+    // Authorization header the axios client would normally add.
     const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${slug}.zip`);
+    link.href = buildResourceUrl(`/api/gallery/${encodeURIComponent(slug)}/download-all`);
+    // No value: let Content-Disposition name the file. The attribute is still
+    // needed so a non-attachment error response downloads harmlessly instead of
+    // navigating the visitor out of the gallery.
+    link.setAttribute('download', '');
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
   },
 
   // Download selected photos as ZIP
@@ -104,7 +115,11 @@ export const galleryService = {
       responseType: 'blob',
     });
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+    // Typed explicitly: an untyped Blob is what made Android append .txt to
+    // the filename. This path still buffers, because the selected ids travel
+    // in a POST body and so cannot be a plain link, but a selection is a
+    // handful of photos rather than the whole gallery.
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/zip' }));
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `${slug}-selected.zip`);
