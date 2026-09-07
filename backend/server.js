@@ -567,8 +567,14 @@ async function sendPlainSpaShell(res, next) {
 app.get('/gallery/:slug', async (req, res, next) => {
   try {
     const { slug } = req.params;
+    // A gallery is reachable by two different strings: its slug, and the
+    // share token that the links actually sent to clients are built from.
+    // Looking up by slug alone missed every shared link — precisely the case
+    // where a preview matters — so those fell back to the generic SPA shell
+    // and chat apps showed 'PicPeak - Photo Sharing Platform'.
     const event = await db('events')
-      .where({ slug, is_active: true, is_archived: false })
+      .where({ is_active: true, is_archived: false })
+      .andWhere((builder) => builder.where({ slug }).orWhere({ share_token: slug }))
       .select('event_name')
       .first();
 
@@ -588,6 +594,10 @@ app.get('/gallery/:slug', async (req, res, next) => {
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${escapeHtml(description)}" />
     <meta property="og:image" content="${escapeHtml(imageUrl)}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${escapeHtml(event.event_name)}" />
     <meta property="og:url" content="${escapeHtml(pageUrl)}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${escapeHtml(title)}" />

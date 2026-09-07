@@ -1182,8 +1182,12 @@ router.get('/:slug/preview-image', async (req, res) => {
   try {
     const { slug } = req.params;
 
+    // Accept the share token as well as the slug: the meta tags point here
+    // using whichever identifier the visitor arrived with, and a shared link
+    // carries the token.
     const event = await db('events')
-      .where({ slug, is_active: formatBoolean(true), is_archived: formatBoolean(false) })
+      .where({ is_active: formatBoolean(true), is_archived: formatBoolean(false) })
+      .andWhere((builder) => builder.where({ slug }).orWhere({ share_token: slug }))
       .select('id', 'hero_photo_id')
       .first();
 
