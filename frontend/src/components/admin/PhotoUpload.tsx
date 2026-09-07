@@ -143,55 +143,92 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ eventId, onUploadCompl
 
     const totalUnits = chunks.length + oversizedFiles.length;
     setTotalChunks(totalUnits);
-    let unitIndex = 0;
     let totalUploaded = 0;
-    let failedFiles: string[] = [];
+    const failedFiles: string[] = [];
 
-    try {
-      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        setCurrentChunk(unitIndex + 1);
-        const chunk = chunks[chunkIndex];
-        const formData = new FormData();
-        
-        chunk.forEach((file) => {
-          formData.append('photos', file);
-        });
-        
-        if (selectedCategoryId) {
-          formData.append('category_id', selectedCategoryId.toString());
-        }
+    // A phone hotspot never saturates a single TCP stream, and the old loop
+    // also left the uplink idle while the server thumbnailed the chunk it had
+    // just finished receiving. Running a few chunks at once keeps bytes moving
+    // the whole time. Three is deliberate: the box has 4 cores and does its
+    // image work inside the request, so more connections would only queue up
+    // behind sharp without putting anything extra on the wire.
+    const UPLOAD_CONCURRENCY = 3;
 
-        try {
-          await api.post(`/admin/events/${eventId}/upload`, formData, {
-            onUploadProgress: (progressEvent) => {
-              if (progressEvent.total) {
-                // Calculate overall progress across all chunks
-                const chunkProgress = progressEvent.loaded / progressEvent.total;
-                const overallProgress = ((unitIndex + chunkProgress) / totalUnits) * 100;
-                setUploadProgress(Math.round(overallProgress));
-              }
-            },
-          });
+    // Per-unit fractional progress (0..1), summed into one overall percentage.
+    // Chunks now finish out of order, so progress can no longer be derived from
+    // a single 'current unit' counter.
+    const unitProgress = new Array<number>(totalUnits).fill(0);
+    let completedUnits = 0;
 
-          totalUploaded += chunk.length;
-        } catch (error: any) {
-          console.error(`Error uploading chunk ${chunkIndex + 1}:`, error);
-          failedFiles.push(...chunk.map(f => f.name));
-        }
-        unitIndex++;
+    const publishProgress = () => {
+      const done = unitProgress.reduce((sum, p) => sum + p, 0);
+      setUploadProgress(Math.round((done / totalUnits) * 100));
+      // With several chunks in flight there is no single 'current' one; show
+      // how far through the queue we are instead.
+      setCurrentChunk(Math.min(completedUnits + 1, totalUnits));
+    };
+
+    const uploadChunk = async (chunk: File[], unitIndex: number) => {
+      const formData = new FormData();
+
+      chunk.forEach((file) => {
+        formData.append('photos', file);
+      });
+
+      if (selectedCategoryId) {
+        formData.append('category_id', selectedCategoryId.toString());
       }
 
-      // Oversized files, one at a time, in 10MB pieces.
-      for (const file of oversizedFiles) {
-        setCurrentChunk(unitIndex + 1);
+      try {
+        await api.post(`/admin/events/${eventId}/upload`, formData, {
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              unitProgress[unitIndex] = progressEvent.loaded / progressEvent.total;
+              publishProgress();
+            }
+          },
+        });
+
+        totalUploaded += chunk.length;
+      } catch (error: any) {
+        console.error(`Error uploading chunk ${unitIndex + 1}:`, error);
+        failedFiles.push(...chunk.map(f => f.name));
+      }
+
+      unitProgress[unitIndex] = 1;
+      completedUnits++;
+      publishProgress();
+    };
+
+    try {
+      // Worker pool rather than fixed slices: each worker pulls the next chunk
+      // off the queue, so one slow chunk never holds up the ones behind it.
+      let nextChunk = 0;
+      const workers = Array.from(
+        { length: Math.min(UPLOAD_CONCURRENCY, chunks.length) },
+        async () => {
+          while (nextChunk < chunks.length) {
+            const index = nextChunk++;
+            await uploadChunk(chunks[index], index);
+          }
+        }
+      );
+      await Promise.all(workers);
+
+      // Oversized files, one at a time, in 10MB pieces. These already split
+      // themselves across many sequential requests, so they saturate the link
+      // on their own and gain nothing from running alongside each other.
+      for (let i = 0; i < oversizedFiles.length; i++) {
+        const file = oversizedFiles[i];
+        const unitIndex = chunks.length + i;
         try {
           await photosService.uploadLargeFile(
             eventId,
             file,
             selectedCategoryId,
             (fileProgress) => {
-              const overallProgress = ((unitIndex + fileProgress / 100) / totalUnits) * 100;
-              setUploadProgress(Math.round(overallProgress));
+              unitProgress[unitIndex] = fileProgress / 100;
+              publishProgress();
             }
           );
           totalUploaded += 1;
@@ -199,7 +236,9 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ eventId, onUploadCompl
           console.error(`Error uploading large file ${file.name}:`, error);
           failedFiles.push(file.name);
         }
-        unitIndex++;
+        unitProgress[unitIndex] = 1;
+        completedUnits++;
+        publishProgress();
       }
 
       // Clear selected files
