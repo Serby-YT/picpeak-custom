@@ -13,7 +13,7 @@ const { resolvePhotoFilePath } = require('../services/photoResolver');
 const { getEventShareToken, resolveShareIdentifier, buildShareLinkVariants } = require('../services/shareLinkService');
 const { handleAsync } = require('../utils/routeHelpers');
 const { NotFoundError } = require('../utils/errors');
-const { ensureThumbnail, ensureHeroImage, ensureDisplayImage } = require('../services/imageProcessor');
+const { ensureThumbnail, ensureThumbnailAtWidth, ensureHeroImage, ensureDisplayImage } = require('../services/imageProcessor');
 const { timingSafeEqualStr } = require('../utils/timingSafe');
 
 // Get storage path from environment or default
@@ -1011,6 +1011,34 @@ router.get('/:slug/preview/:photoId',
 );
 
 // Serve thumbnail
+
+// Thumbnails keep the original photo's extension (thumb_wedding_0001.jpg) while
+// holding whatever thumbnail_format produced, which here is WebP — so the name
+// cannot be trusted to describe the bytes. Read the magic number instead. It is
+// a 12-byte read against a file that was just stat()ed, so it is already warm.
+async function detectImageMime(filePath) {
+  const fsp = require('fs').promises;
+  let handle;
+  try {
+    handle = await fsp.open(filePath, 'r');
+    const { buffer, bytesRead } = await handle.read(Buffer.alloc(12), 0, 12, 0);
+    if (bytesRead >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
+      return 'image/webp';
+    }
+    if (bytesRead >= 8 && buffer.toString('hex', 0, 8) === '89504e470d0a1a0a') {
+      return 'image/png';
+    }
+    if (bytesRead >= 3 && buffer.toString('hex', 0, 3) === 'ffd8ff') {
+      return 'image/jpeg';
+    }
+  } catch (error) {
+    // Fall through to the historical default.
+  } finally {
+    await handle?.close();
+  }
+  return 'image/jpeg';
+}
+
 router.get('/:slug/thumbnail/:photoId',
   verifyGalleryAccess,
   async (req, res) => {
@@ -1025,8 +1053,11 @@ router.get('/:slug/thumbnail/:photoId',
         return res.status(404).json({ error: 'Photo not found' });
       }
 
-      // Ensure thumbnail exists and is valid, regenerate if needed
-      const thumbnailPath = await ensureThumbnail(photo);
+      // ?w= asks for a size tier. Without it the caller gets the single large
+      // thumbnail, which is what every existing client already expects.
+      const thumbnailPath =
+        (req.query.w ? await ensureThumbnailAtWidth(photo, req.query.w) : null) ||
+        (await ensureThumbnail(photo));
 
       if (!thumbnailPath) {
         logger.error(`Failed to generate thumbnail for photo ${photoId}`);
@@ -1060,9 +1091,16 @@ router.get('/:slug/thumbnail/:photoId',
       }
 
       // Set appropriate headers with enhanced security
+      // The file is whatever thumbnail_format produced — WebP here. This used
+      // to claim image/jpeg unconditionally, which a Blob tolerates but an
+      // <img> served alongside nosniff does not.
+      const thumbnailMime = await detectImageMime(thumbPath);
+
       res.set({
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'private, max-age=7200', // Reduced cache time
+        'Content-Type': thumbnailMime,
+        // Immutable per photo and already ETagged; a week lets a returning
+        // visitor scroll the gallery without refetching a single tile.
+        'Cache-Control': 'private, max-age=604800',
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'X-Content-Type-Options': 'nosniff',
         'X-Protected-Thumbnail': 'true',

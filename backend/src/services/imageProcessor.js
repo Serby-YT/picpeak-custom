@@ -124,7 +124,21 @@ async function generateThumbnail(imagePath, options = {}) {
     });
     
     // Strip EXIF/metadata from thumbnails (privacy: prevent GPS leak etc.)
-    sharpInstance = sharpInstance.withMetadata(false);
+    // Strip EXIF/ICC and normalise to sRGB.
+    //
+    // This used to read .withMetadata(false), which does the opposite of what
+    // it looks like: in sharp any withMetadata() call *enables* metadata
+    // retention, so the original 13.7KB EXIF block and the ICC profile were
+    // copied into every derivative. Two consequences, both bad. The files were
+    // about three times their necessary size — a 400px tile measured 41KB
+    // against 13KB — and the privacy intent stated here was inverted, with
+    // camera, lens, timestamps and any GPS the camera recorded shipped to
+    // every gallery visitor. Omitting the call entirely is what strips them.
+    //
+    // toColourspace makes dropping the profile safe: these originals are
+    // already sRGB, but an AdobeRGB export would otherwise render flat once
+    // its profile was gone.
+    sharpInstance = sharpInstance.toColourspace('srgb');
 
     // Apply resize with configured settings
     // For square thumbnails with 'cover' fit, we crop to center
@@ -383,7 +397,21 @@ async function generateHeroImage(imagePath, options = {}) {
     });
 
     // Strip EXIF/metadata from hero images (privacy: prevent GPS leak etc.)
-    sharpInstance = sharpInstance.withMetadata(false);
+    // Strip EXIF/ICC and normalise to sRGB.
+    //
+    // This used to read .withMetadata(false), which does the opposite of what
+    // it looks like: in sharp any withMetadata() call *enables* metadata
+    // retention, so the original 13.7KB EXIF block and the ICC profile were
+    // copied into every derivative. Two consequences, both bad. The files were
+    // about three times their necessary size — a 400px tile measured 41KB
+    // against 13KB — and the privacy intent stated here was inverted, with
+    // camera, lens, timestamps and any GPS the camera recorded shipped to
+    // every gallery visitor. Omitting the call entirely is what strips them.
+    //
+    // toColourspace makes dropping the profile safe: these originals are
+    // already sRGB, but an AdobeRGB export would otherwise render flat once
+    // its profile was gone.
+    sharpInstance = sharpInstance.toColourspace('srgb');
 
     // Resize to fit hero dimensions while maintaining aspect ratio
     // Use 'cover' to fill the hero area (crops if needed)
@@ -526,7 +554,21 @@ async function generateDisplayImage(imagePath) {
       failOnError: false
     });
 
-    sharpInstance = sharpInstance.withMetadata(false);
+    // Strip EXIF/ICC and normalise to sRGB.
+    //
+    // This used to read .withMetadata(false), which does the opposite of what
+    // it looks like: in sharp any withMetadata() call *enables* metadata
+    // retention, so the original 13.7KB EXIF block and the ICC profile were
+    // copied into every derivative. Two consequences, both bad. The files were
+    // about three times their necessary size — a 400px tile measured 41KB
+    // against 13KB — and the privacy intent stated here was inverted, with
+    // camera, lens, timestamps and any GPS the camera recorded shipped to
+    // every gallery visitor. Omitting the call entirely is what strips them.
+    //
+    // toColourspace makes dropping the profile safe: these originals are
+    // already sRGB, but an AdobeRGB export would otherwise render flat once
+    // its profile was gone.
+    sharpInstance = sharpInstance.toColourspace('srgb');
 
     // 'inside' — downscale only, preserve full frame and aspect ratio.
     // Never crops and never upscales (withoutEnlargement default true here
@@ -685,8 +727,98 @@ async function generateDerivatives(imagePath) {
   return result;
 }
 
+// Widths the gallery is allowed to ask for. A closed set, because each one is
+// a file on disk and an open parameter would let a caller fill the volume with
+// arbitrary sizes. 400 covers a two-column phone grid at 2x, 800 a tablet or a
+// dense desktop column, 1200 the largest tile any layout renders.
+const THUMBNAIL_WIDTHS = [400, 800, 1200];
+
+function normalizeThumbnailWidth(requested) {
+  const value = parseInt(requested, 10);
+  if (!Number.isFinite(value)) return null;
+  // Round up to the first tier that covers the request, so a 500px slot is
+  // served the 800 rather than an upscaled 400.
+  return THUMBNAIL_WIDTHS.find((w) => w >= value) || null;
+}
+
+/**
+ * A thumbnail at one of the allowed widths, generated on first request and
+ * cached on disk beside the others.
+ *
+ * The single 1200px thumbnail was being sent to every device: on a phone
+ * showing two columns that is roughly ten times the pixels the screen can use,
+ * and across a gallery of eighty photos it is about 14MB where 0.5MB would do.
+ *
+ * Built from the display copy when one exists — decoding a 2560px WebP is far
+ * cheaper than a 32MP original, and it is still larger than every tier here.
+ */
+async function ensureThumbnailAtWidth(photo, requestedWidth) {
+  const width = normalizeThumbnailWidth(requestedWidth);
+  if (!width) return null;
+
+  const { resolvePhotoFilePath } = require("./photoResolver");
+  const { db } = require("../database/db");
+
+  let originalPath;
+  try {
+    const event = await db("events").where("id", photo.event_id).first();
+    originalPath = resolvePhotoFilePath(event, photo);
+  } catch (error) {
+    logger.error(`Could not resolve source for sized thumbnail (photo ${photo.id}): ${error.message}`);
+    return null;
+  }
+
+  const tierDir = path.join(getThumbnailPath(), `w${width}`);
+  const filename = `thumb_${path.basename(originalPath)}`;
+  const tierPath = path.join(tierDir, filename);
+
+  try {
+    const stats = await fs.stat(tierPath);
+    if (stats.size > 0) {
+      return path.relative(getStoragePath(), tierPath);
+    }
+  } catch (err) {
+    // Not built yet.
+  }
+
+  let source = originalPath;
+  try {
+    const displayCandidate = path.join(getDisplayPath(), displayFilename(originalPath));
+    const displayStats = await fs.stat(displayCandidate);
+    if (displayStats.size > 0) source = displayCandidate;
+  } catch (err) {
+    // No display copy; fall back to the original.
+  }
+
+  await fs.mkdir(tierDir, { recursive: true });
+  const tempPath = `${tierPath}.${process.pid}.${Date.now()}.tmp`;
+
+  try {
+    await sharp(source, { sequentialRead: true, failOnError: false })
+      .toColourspace('srgb')
+      .resize(width, width, { fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 82, effort: 4 })
+      .toFile(tempPath);
+
+    const stats = await fs.stat(tempPath);
+    if (stats.size === 0) {
+      await fs.unlink(tempPath).catch(() => {});
+      throw new Error("Generated thumbnail is empty");
+    }
+
+    await fs.rename(tempPath, tierPath);
+    return path.relative(getStoragePath(), tierPath);
+  } catch (error) {
+    logger.error(`Failed to build ${width}px thumbnail for photo ${photo.id}: ${error.message}`);
+    await fs.unlink(tempPath).catch(() => {});
+    return null;
+  }
+}
+
 module.exports = {
   generateThumbnail,
+  ensureThumbnailAtWidth,
+  THUMBNAIL_WIDTHS,
   generateDerivatives,
   isThumbnailValid,
   ensureThumbnail,

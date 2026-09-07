@@ -36,6 +36,21 @@ interface AuthenticatedImageProps extends Omit<React.ImgHTMLAttributes<HTMLImage
   onLoad?: () => void;
 }
 
+// The size tiers the gallery thumbnail endpoint will build on request. Kept in
+// step with THUMBNAIL_WIDTHS on the backend.
+const THUMBNAIL_TIERS = [400, 800, 1200];
+
+// Assumes the gallery grid: two columns on a phone, three on a tablet, four on
+// a desktop. Without this the browser assumes the image spans the viewport and
+// picks the largest tier, which would undo the whole point of the srcset.
+const DEFAULT_TILE_SIZES = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw';
+
+const buildThumbnailSrcSet = (resolvedSrc: string): string | undefined => {
+  if (!resolvedSrc.includes('/thumbnail/')) return undefined;
+  const joiner = resolvedSrc.includes('?') ? '&' : '?';
+  return THUMBNAIL_TIERS.map((w) => `${resolvedSrc}${joiner}w=${w} ${w}w`).join(', ');
+};
+
 export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   src,
   fallbackSrc,
@@ -90,6 +105,43 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
 
+  // Route the pixels through a plain <img> whenever no protection feature
+  // needs them to pass through JS first. That is the ordinary case here, and
+  // on a phone it is the difference between a usable gallery and an unusable
+  // one. Fetching each tile by hand into a Blob meant every image in the
+  // gallery was requested the moment it mounted — eighty at once for a real
+  // event — with no way for the browser to lazy-load them, choose a smaller
+  // file for a small screen, or reuse its own HTTP cache on the next visit.
+  //
+  // Same-origin subresources carry the gallery cookie, so authentication is
+  // unaffected; SameSite=Lax only withholds cookies from cross-site requests.
+  const plainImageSrc = React.useMemo(() => {
+    if (!src) return null;
+    const needsScriptedPixels =
+      useCanvasRendering ||
+      useEnhancedProtection ||
+      fragmentGrid ||
+      scrambleFragments ||
+      overlayProtection ||
+      protectionLevel === 'enhanced' ||
+      protectionLevel === 'maximum';
+    if (needsScriptedPixels) return null;
+
+    return src.startsWith('/admin')
+      ? buildResourceUrl(`/api${src}`)
+      : src.startsWith('/')
+        ? buildResourceUrl(src)
+        : src;
+  }, [
+    src,
+    useCanvasRendering,
+    useEnhancedProtection,
+    fragmentGrid,
+    scrambleFragments,
+    overlayProtection,
+    protectionLevel,
+  ]);
+
   // Draw image to canvas when canvas rendering is enabled
   const drawToCanvas = useCallback(() => {
     if (!useCanvasRendering || !canvasRef.current || !imageRef.current) return;
@@ -113,6 +165,12 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   useEffect(() => {
     let aborted = false;
     const objectUrls: string[] = [];
+
+    // Nothing to fetch by hand in plain mode — the browser owns the request.
+    if (plainImageSrc) {
+      setIsLoading(false);
+      return;
+    }
 
     // Determine which token to use based on context
     if (!src) {
@@ -244,6 +302,23 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
       img.onerror = null;
     };
   }, [imageSrc, useCanvasRendering, drawToCanvas, onLoad]);
+
+  if (plainImageSrc) {
+    const { sizes: callerSizes, loading: callerLoading, ...imgProps } = props;
+    const srcSet = buildThumbnailSrcSet(plainImageSrc);
+    return (
+      <img
+        src={plainImageSrc}
+        srcSet={srcSet}
+        sizes={srcSet ? callerSizes || DEFAULT_TILE_SIZES : callerSizes}
+        loading={callerLoading || 'lazy'}
+        decoding="async"
+        alt={alt}
+        onLoad={onLoad}
+        {...imgProps}
+      />
+    );
+  }
 
   if (isLoading) {
     if (placeholderSrc) {
