@@ -5,8 +5,8 @@ const fs = require('fs').promises;
 const { db, logActivity } = require('../database/db');
 const { adminAuth } = require('../middleware/auth');
 const { requirePermission } = require('../middleware/permissions');
-const { generateThumbnail, ensureThumbnail, generateDisplayImage, extractCaptureDate } = require('../services/imageProcessor');
-const { processUploadedVideo, isVideoMimeType } = require('../services/videoProcessor');
+const { ensureThumbnail, extractCaptureDate } = require('../services/imageProcessor');
+const { isVideoMimeType } = require('../services/videoProcessor');
 const { generatePhotoFilename } = require('../utils/filenameSanitizer');
 const { escapeLikePattern } = require('../utils/sqlSecurity');
 const { validateUploadedFiles } = require('../middleware/uploadValidation');
@@ -14,6 +14,7 @@ const { getMaxFilesPerUpload, getAllowedMimeTypes } = require('../services/uploa
 const { processUploadedPhotos } = require('../services/photoProcessor');
 const chunkedUpload = require('../services/chunkedUploadService');
 const watermarkGeneratorService = require('../services/watermarkGeneratorService');
+const imageDerivativeQueue = require('../services/imageDerivativeQueue');
 const router = express.Router();
 
 // Get storage path from environment or default
@@ -332,76 +333,25 @@ router.post('/:eventId/upload', adminAuth, requirePermission('photos.upload'), u
                 throw new Error(`File size mismatch after move: expected ${operation.photoData.size_bytes}, got ${finalStats.size}`);
               }
               
-              // Generate thumbnail and extract metadata
+              // Everything past the file being safely on disk — thumbnail,
+              // display copy, dimensions, watermark — is derivative work the
+              // uploader does not need to wait for. Doing it inside the request
+              // cost roughly 4.5s per chunk of ten photos, and because the
+              // browser cannot start the next chunk until the response lands,
+              // that was 4.5s with nothing at all on the wire. Over a phone
+              // hotspot it repeated once per chunk.
+              //
+              // The queue picks these up two at a time. If the admin opens the
+              // grid before it gets there, the thumbnail route regenerates on
+              // demand from whichever source is cheapest, so nothing waits on
+              // the queue to see its photos.
               const photoId = insertedIds[idx]?.id || insertedIds[idx];
-              const isVideoFile = isVideoMimeType(operation.photoData.mime_type);
-              let thumbnailPath = null;
-
-              try {
-                if (isVideoFile) {
-                  // Process video: extract metadata and generate thumbnail
-                  const thumbnailDir = path.join(getStoragePath(), 'thumbnails');
-                  await fs.mkdir(thumbnailDir, { recursive: true });
-                  const videoThumbnailPath = path.join(thumbnailDir, `thumb_${operation.filename.replace(/\.[^.]+$/, '.jpg')}`);
-
-                  const result = await processUploadedVideo(operation.finalPath, videoThumbnailPath);
-                  thumbnailPath = path.relative(getStoragePath(), videoThumbnailPath);
-
-                  if (photoId && result.metadata) {
-                    await db('photos')
-                      .where({ id: photoId })
-                      .update({
-                        thumbnail_path: thumbnailPath,
-                        duration: result.metadata.duration,
-                        video_codec: result.metadata.videoCodec,
-                        audio_codec: result.metadata.audioCodec,
-                        width: result.metadata.width,
-                        height: result.metadata.height
-                      });
-                  }
-                } else {
-                  thumbnailPath = await generateThumbnail(operation.finalPath);
-
-                  // Pre-generate the lightbox display variant now (upload time)
-                  // rather than on a client's first view — moves the cost off
-                  // the viewing path entirely. Non-fatal: a failure here just
-                  // means it falls back to on-demand generation on first view.
-                  generateDisplayImage(operation.finalPath).catch((err) => {
-                    console.warn(`Display image pre-generation failed for ${operation.filename}:`, err.message);
-                  });
-
-                  // Update the database with thumbnail path and image dimensions
-                  if (photoId) {
-                    const updateData = {};
-                    if (thumbnailPath) updateData.thumbnail_path = thumbnailPath;
-
-                    try {
-                      const sharp = require('sharp');
-                      const metadata = await sharp(operation.finalPath).metadata();
-                      if (metadata.width && metadata.height) {
-                        updateData.width = metadata.width;
-                        updateData.height = metadata.height;
-                      }
-                    } catch (metadataError) {
-                      console.warn(`Could not extract image dimensions for ${operation.filename}:`, metadataError.message);
-                    }
-
-                    if (Object.keys(updateData).length > 0) {
-                      await db('photos')
-                        .where({ id: photoId })
-                        .update(updateData);
-                    }
-                  }
-                }
-              } catch (thumbError) {
-                console.error(`Thumbnail/metadata processing failed for ${operation.filename}:`, thumbError.message);
-              }
-
-              // Queue watermark generation in background (non-blocking, images only)
-              if (photoId && !isVideoFile) {
-                watermarkGeneratorService.generateForPhoto(photoId)
-                  .catch(err => console.warn(`Watermark generation queued failed for photo ${photoId}:`, err.message));
-              }
+              imageDerivativeQueue.enqueue({
+                photoId,
+                filePath: operation.finalPath,
+                filename: operation.filename,
+                mimeType: operation.photoData.mime_type
+              });
               
               // Add to successful uploads
               uploadedPhotos.push({

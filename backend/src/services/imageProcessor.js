@@ -84,7 +84,10 @@ async function getThumbnailSettings() {
 }
 
 async function generateThumbnail(imagePath, options = {}) {
-  const filename = path.basename(imagePath);
+  // options.nameFrom lets the thumbnail be *read* from one file but *named*
+  // after another, so it can be built from the cheap display copy while
+  // keeping the thumb_<original> filename every other lookup expects.
+  const filename = path.basename(options.nameFrom || imagePath);
   const thumbnailFilename = `thumb_${filename}`;
   const thumbnailDir = getThumbnailPath();
   const thumbnailPath = path.join(thumbnailDir, thumbnailFilename);
@@ -151,25 +154,43 @@ async function generateThumbnail(imagePath, options = {}) {
       });
     }
     
-    // Save the thumbnail
-    await sharpInstance.toFile(thumbnailPath);
-    
+    // Write to a scratch name and rename into place. The serve path
+    // regenerates missing thumbnails on demand, so two requests (or a request
+    // and the derivative queue) can be producing the same file at the same
+    // moment; without this they interleave writes and leave a truncated image.
+    // rename(2) within a directory is atomic, so a reader sees the old file or
+    // the new one, never a half-written one.
+    const tempThumbnailPath = `${thumbnailPath}.${process.pid}.${Date.now()}.tmp`;
+    await sharpInstance.toFile(tempThumbnailPath);
+
     // Verify the thumbnail was created successfully
-    const stats = await fs.stat(thumbnailPath);
+    const stats = await fs.stat(tempThumbnailPath);
     if (stats.size === 0) {
+      await fs.unlink(tempThumbnailPath).catch(() => {});
       throw new Error('Generated thumbnail is empty');
     }
-    
+
+    await fs.rename(tempThumbnailPath, thumbnailPath);
+
     return path.relative(getStoragePath(), thumbnailPath);
   } catch (error) {
     const msg = (error && error.message) ? error.message : String(error);
     logger.error(`Failed to generate thumbnail for ${filename}: ${msg}`);
     
-    // Clean up any partially created file
+    // Clean up any partially created file. The scratch name is only known
+    // inside the try block, so sweep the directory for this run's leftovers.
+    await fs.unlink(thumbnailPath).catch(() => {});
     try {
-      await fs.unlink(thumbnailPath);
-    } catch (unlinkErr) {
-      // Ignore unlink errors
+      const dir = path.dirname(thumbnailPath);
+      const base = path.basename(thumbnailPath);
+      const leftovers = await fs.readdir(dir);
+      await Promise.all(
+        leftovers
+          .filter((name) => name.startsWith(`${base}.${process.pid}.`) && name.endsWith('.tmp'))
+          .map((name) => fs.unlink(path.join(dir, name)).catch(() => {}))
+      );
+    } catch (sweepErr) {
+      // Ignore - a stray scratch file is harmless
     }
     
     // Return null if thumbnail generation fails, don't fail the whole upload
@@ -224,8 +245,27 @@ async function ensureThumbnail(photo) {
     logger.warn(`Invalid thumbnail detected for photo ${photo.id}, regenerating...`);
   }
   
-  // Generate new thumbnail
-  const newThumbnailPath = await generateThumbnail(originalPath, { regenerate: true });
+  // Generate new thumbnail. Prefer the display copy as the source when one
+  // exists: it is a 2560px WebP that decodes in a fraction of the time of a
+  // 32MP camera original, is still comfortably larger than the thumbnail it
+  // feeds, and is indistinguishable at thumbnail scale. This route is hit for
+  // every tile of a freshly uploaded event, so the difference is the whole
+  // grid loading briskly rather than the box decoding full-size JPEGs.
+  let thumbnailSource = originalPath;
+  try {
+    const displayCandidate = path.join(getDisplayPath(), displayFilename(originalPath));
+    const displayStats = await fs.stat(displayCandidate);
+    if (displayStats.size > 0) {
+      thumbnailSource = displayCandidate;
+    }
+  } catch (err) {
+    // No display copy yet — fall back to decoding the original.
+  }
+
+  const newThumbnailPath = await generateThumbnail(thumbnailSource, {
+    regenerate: true,
+    nameFrom: originalPath
+  });
   
   if (newThumbnailPath) {
     // Update database with new thumbnail path
@@ -498,21 +538,35 @@ async function generateDisplayImage(imagePath) {
 
     sharpInstance = sharpInstance.webp({ quality: DEFAULT_DISPLAY_QUALITY, effort: 4 });
 
-    await sharpInstance.toFile(displayPath);
+    // Same reason as the thumbnail: written under a scratch name and renamed
+    // into place, so a concurrent generator cannot be read mid-write.
+    const tempDisplayPath = `${displayPath}.${process.pid}.${Date.now()}.tmp`;
+    await sharpInstance.toFile(tempDisplayPath);
 
-    const stats = await fs.stat(displayPath);
+    const stats = await fs.stat(tempDisplayPath);
     if (stats.size === 0) {
+      await fs.unlink(tempDisplayPath).catch(() => {});
       throw new Error('Generated display image is empty');
     }
+
+    await fs.rename(tempDisplayPath, displayPath);
 
     return path.relative(getStoragePath(), displayPath);
   } catch (error) {
     const msg = (error && error.message) ? error.message : String(error);
     logger.error(`Failed to generate display image for ${path.basename(imagePath)}: ${msg}`);
+    await fs.unlink(displayPath).catch(() => {});
     try {
-      await fs.unlink(displayPath);
-    } catch (unlinkErr) {
-      // Ignore
+      const dir = path.dirname(displayPath);
+      const base = path.basename(displayPath);
+      const leftovers = await fs.readdir(dir);
+      await Promise.all(
+        leftovers
+          .filter((name) => name.startsWith(`${base}.${process.pid}.`) && name.endsWith('.tmp'))
+          .map((name) => fs.unlink(path.join(dir, name)).catch(() => {}))
+      );
+    } catch (sweepErr) {
+      // Ignore - a stray scratch file is harmless
     }
     return null;
   }
@@ -587,8 +641,53 @@ async function extractCaptureDate(imagePath) {
   }
 }
 
+/**
+ * Build both derivative sizes from a single decode of the original.
+ *
+ * The old upload path opened the same 32MP camera file four times: metadata
+ * for the thumbnail, the thumbnail resize, metadata again for the stored
+ * dimensions, then metadata plus the resize for the display copy. Decoding a
+ * 6960x4640 JPEG is nearly all of the cost, so the display copy is made from
+ * the original once and the thumbnail is taken from *that*: a 2560px WebP
+ * decodes in a fraction of the time and is still more than twice the size of
+ * the thumbnail it feeds, so nothing is upscaled and the result is visually
+ * identical at thumbnail scale.
+ *
+ * Falls back to reading the original if the display copy could not be
+ * written, so a failure here costs speed, never a missing thumbnail.
+ */
+async function generateDerivatives(imagePath) {
+  const result = { thumbnailPath: null, displayPath: null, width: null, height: null };
+  const filename = path.basename(imagePath);
+
+  try {
+    const metadata = await sharp(imagePath).metadata();
+    if (metadata.width && metadata.height) {
+      result.width = metadata.width;
+      result.height = metadata.height;
+    }
+  } catch (error) {
+    logger.warn(`Could not read dimensions for ${filename}: ${error.message}`);
+  }
+
+  result.displayPath = await generateDisplayImage(imagePath);
+
+  const thumbnailSource = result.displayPath
+    ? path.join(getStoragePath(), result.displayPath)
+    : imagePath;
+
+  try {
+    result.thumbnailPath = await generateThumbnail(thumbnailSource, { nameFrom: imagePath });
+  } catch (error) {
+    logger.error(`Failed to generate thumbnail for ${filename}: ${error.message}`);
+  }
+
+  return result;
+}
+
 module.exports = {
   generateThumbnail,
+  generateDerivatives,
   isThumbnailValid,
   ensureThumbnail,
   generateVideoPlaceholder,
