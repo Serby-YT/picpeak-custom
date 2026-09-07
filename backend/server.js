@@ -564,6 +564,54 @@ async function sendPlainSpaShell(res, next) {
   }
 }
 
+// Background colour of each built-in gallery theme, mirroring the presets in
+// frontend/src/types/theme.types.ts. Duplicated deliberately: the palette is
+// needed in the very first bytes of HTML, before any JS has run, and the
+// frontend definition is not reachable from here. Keep in step if a preset is
+// added or recoloured.
+const THEME_BACKGROUNDS = {
+  default: '#fafafa',
+  elegantWedding: '#fdfcfb',
+  modernMasonry: '#ffffff',
+  birthdayFun: '#fef3c7',
+  corporateTimeline: '#f9fafb',
+  artisticMosaic: '#faf5ff',
+  darkClassic: '#0f0f0f',
+  darkElegant: '#121212',
+  darkModern: '#0a0a0a',
+  galleryPremium: '#ffffff',
+  galleryStory: '#ffffff',
+};
+
+const DARK_THEMES = new Set(['darkClassic', 'darkElegant', 'darkModern']);
+
+// The event's theme is applied by the app once it has loaded and asked for the
+// gallery. Until then the page paints with the default light palette, so a dark
+// gallery opens as a full screen of white and then snaps to black — on a phone,
+// at night, that is the first thing a client sees. Painting the right colour
+// from the first byte costs one <style> block.
+function resolveThemeBackground(colorTheme) {
+  if (!colorTheme) return null;
+
+  let themeName = colorTheme;
+  // color_theme normally holds a preset name, but tolerate a JSON override.
+  if (typeof colorTheme === 'string' && colorTheme.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(colorTheme);
+      if (parsed.backgroundColor) {
+        return { background: parsed.backgroundColor, dark: parsed.colorMode === 'dark' };
+      }
+      themeName = parsed.name || parsed.theme;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  const background = THEME_BACKGROUNDS[themeName];
+  if (!background) return null;
+  return { background, dark: DARK_THEMES.has(themeName) };
+}
+
 app.get('/gallery/:slug', async (req, res, next) => {
   try {
     const { slug } = req.params;
@@ -575,7 +623,7 @@ app.get('/gallery/:slug', async (req, res, next) => {
     const event = await db('events')
       .where({ is_active: true, is_archived: false })
       .andWhere((builder) => builder.where({ slug }).orWhere({ share_token: slug }))
-      .select('event_name')
+      .select('event_name', 'color_theme')
       .first();
 
     if (!event) {
@@ -593,6 +641,16 @@ app.get('/gallery/:slug', async (req, res, next) => {
     const description = `Vezi și descarcă fotografiile din galeria ${event.event_name}`;
 
     const html = await getSpaShell();
+    // Paint the gallery's own background immediately, and tell the browser
+    // which scheme it is so its scrollbars and form controls match rather than
+    // flashing light chrome over a dark page.
+    const theme = resolveThemeBackground(event.color_theme);
+    const themeStyle = theme
+      ? `
+    <meta name="theme-color" content="${escapeHtml(theme.background)}" />
+    <style>:root{color-scheme:${theme.dark ? 'dark' : 'light'};--color-background:${theme.background}}html,body{background-color:${theme.background}}</style>`
+      : '';
+
     const metaTags = `
     <meta property="og:type" content="website" />
     <meta property="og:title" content="${escapeHtml(title)}" />
@@ -606,7 +664,7 @@ app.get('/gallery/:slug', async (req, res, next) => {
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${escapeHtml(title)}" />
     <meta name="twitter:description" content="${escapeHtml(description)}" />
-    <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />
+    <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />${themeStyle}
   </head>`;
 
     const injected = html

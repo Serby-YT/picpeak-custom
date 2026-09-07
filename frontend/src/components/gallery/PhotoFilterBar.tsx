@@ -186,7 +186,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                     variant={currentFilter === 'all' ? 'primary' : 'outline'}
                     size="sm"
                     onClick={() => onFilterChange('all')}
-                    className="p-1 w-8 h-8 flex items-center justify-center"
+                    className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                     aria-label={t('gallery.all', 'All')}
                   >
                     <Grid className="w-3.5 h-3.5" />
@@ -195,7 +195,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                     variant={currentFilter === 'liked' ? 'primary' : 'outline'}
                     size="sm"
                     onClick={() => onFilterChange('liked')}
-                    className="p-1 w-8 h-8 flex items-center justify-center"
+                    className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                     aria-label={t('feedback.likes', 'Likes')}
                   >
                     <Heart className="w-3.5 h-3.5" />
@@ -204,7 +204,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                     variant={currentFilter === 'favorited' ? 'primary' : 'outline'}
                     size="sm"
                     onClick={() => onFilterChange('favorited')}
-                    className="p-1 w-8 h-8 flex items-center justify-center"
+                    className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                     aria-label={t('gallery.favorited', 'Saved')}
                   >
                     <Bookmark className="w-3.5 h-3.5" />
@@ -213,7 +213,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                     variant={currentFilter === 'rated' ? 'primary' : 'outline'}
                     size="sm"
                     onClick={() => onFilterChange('rated')}
-                    className="p-1 w-8 h-8 flex items-center justify-center"
+                    className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                     aria-label={t('gallery.rated', 'Rated')}
                   >
                     <Star className="w-3.5 h-3.5" />
@@ -222,7 +222,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                     variant={currentFilter === 'commented' ? 'primary' : 'outline'}
                     size="sm"
                     onClick={() => onFilterChange('commented')}
-                    className="p-1 w-8 h-8 flex items-center justify-center"
+                    className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                     aria-label={t('gallery.commented', 'Commented')}
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
@@ -282,7 +282,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                 variant={currentFilter === 'all' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => onFilterChange('all')}
-                className="p-1 w-8 h-8 flex items-center justify-center"
+                className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                 aria-label={t('gallery.all', 'All')}
               >
                 <Grid className="w-3.5 h-3.5" />
@@ -291,7 +291,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                 variant={currentFilter === 'liked' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => onFilterChange('liked')}
-                className="p-1 w-8 h-8 flex items-center justify-center"
+                className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                 aria-label={t('feedback.likes', 'Likes')}
               >
                 <Heart className="w-3.5 h-3.5" />
@@ -300,7 +300,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                 variant={currentFilter === 'favorited' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => onFilterChange('favorited')}
-                className="p-1 w-8 h-8 flex items-center justify-center"
+                className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                 aria-label={t('gallery.favorited', 'Saved')}
               >
                 <Bookmark className="w-3.5 h-3.5" />
@@ -309,7 +309,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                 variant={currentFilter === 'rated' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => onFilterChange('rated')}
-                className="p-1 w-8 h-8 flex items-center justify-center"
+                className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                 aria-label={t('gallery.rated', 'Rated')}
               >
                 <Star className="w-3.5 h-3.5" />
@@ -318,7 +318,7 @@ export const PhotoFilterBar: React.FC<PhotoFilterBarProps> = ({
                 variant={currentFilter === 'commented' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => onFilterChange('commented')}
-                className="p-1 w-8 h-8 flex items-center justify-center"
+                className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
                 aria-label={t('gallery.commented', 'Commented')}
               >
                 <MessageSquare className="w-3.5 h-3.5" />

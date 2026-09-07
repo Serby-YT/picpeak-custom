@@ -131,6 +131,24 @@
     @apply h-11 px-8 text-lg;
   }
 
+  /* A thumb is not a mouse pointer. The gallery's controls were 32-36px, which
+     is fine to click and genuinely awkward to tap — the filter chips especially,
+     at 32px square. 44px is the long-standing platform guidance for a touch
+     target. Scoped to coarse pointers so desktop keeps its density. */
+  @media (pointer: coarse) {
+    .btn-sm,
+    .btn-md {
+      @apply h-11;
+    }
+
+    /* Grows the hit area without moving the icon: the visual size is set by the
+       element's own padding, this only guarantees the target underneath it. */
+    .tap-safe {
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+    }
+  }
+
   /* Input styles - Admin inputs use explicit Tailwind colors */
   .input {
     @apply flex h-10 w-full rounded-lg border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;

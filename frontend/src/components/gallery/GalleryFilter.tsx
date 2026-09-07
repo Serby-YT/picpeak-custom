@@ -47,7 +47,7 @@ export const GalleryFilter: React.FC<GalleryFilterProps> = ({
               variant={currentFilter === 'all' ? 'primary' : 'outline'}
               size="sm"
               onClick={() => onFilterChange('all')}
-              className="p-1 w-8 h-8 flex items-center justify-center"
+              className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
               aria-label={t('gallery.all', 'All')}
             >
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-current"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 8v-8h8v8h-8z"/></svg>
@@ -56,7 +56,7 @@ export const GalleryFilter: React.FC<GalleryFilterProps> = ({
               variant={currentFilter === 'liked' ? 'primary' : 'outline'}
               size="sm"
               onClick={() => onFilterChange('liked')}
-              className="p-1 w-8 h-8 flex items-center justify-center"
+              className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
               aria-label={t('feedback.likes', 'Likes')}
             >
               <Heart className="w-3.5 h-3.5" />
@@ -65,7 +65,7 @@ export const GalleryFilter: React.FC<GalleryFilterProps> = ({
               variant={currentFilter === 'favorited' ? 'primary' : 'outline'}
               size="sm"
               onClick={() => onFilterChange('favorited')}
-              className="p-1 w-8 h-8 flex items-center justify-center"
+              className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
               aria-label={t('gallery.favorited', 'Saved')}
             >
               <Bookmark className="w-3.5 h-3.5" />
@@ -74,7 +74,7 @@ export const GalleryFilter: React.FC<GalleryFilterProps> = ({
               variant={currentFilter === 'rated' ? 'primary' : 'outline'}
               size="sm"
               onClick={() => onFilterChange('rated')}
-              className="p-1 w-8 h-8 flex items-center justify-center"
+              className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
               aria-label={t('gallery.rated', 'Rated')}
             >
               <Star className="w-3.5 h-3.5" />
@@ -83,7 +83,7 @@ export const GalleryFilter: React.FC<GalleryFilterProps> = ({
               variant={currentFilter === 'commented' ? 'primary' : 'outline'}
               size="sm"
               onClick={() => onFilterChange('commented')}
-              className="p-1 w-8 h-8 flex items-center justify-center"
+              className="p-1 w-8 h-8 tap-safe flex items-center justify-center"
               aria-label={t('gallery.commented', 'Commented')}
             >
               <MessageSquare className="w-3.5 h-3.5" />
