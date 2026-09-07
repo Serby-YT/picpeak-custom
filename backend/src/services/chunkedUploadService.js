@@ -17,6 +17,35 @@ const CHUNK_SIZE = 10 * 1024 * 1024;
 const UPLOAD_EXPIRATION_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Build a filesystem-safe name for the merged file.
+ *
+ * The client picks this name and it lands in path.join() when the chunks are
+ * merged, so a caller could otherwise walk out of the temp directory with
+ * "../.." segments and have the merge write anywhere the process can reach
+ * (GHSA-pc72-jf53-w28j). The route behind this needs an admin session, so it
+ * is not reachable anonymously, but nothing about the merge step should depend
+ * on the caller being trusted.
+ *
+ * The original name is kept separately on the upload metadata and still
+ * travels through to original_filename — the Lightroom export reads it, so it
+ * must not be mangled here. This value only ever names a scratch file.
+ */
+function safeStorageName(filename) {
+  // basename() first: strips both separators, and on a POSIX host also handles
+  // a Windows-style path arriving as one component.
+  const base = path.basename(String(filename || "").replace(/\\/g, "/"));
+
+  const extension = path.extname(base);
+  const stem = path.basename(base, extension);
+
+  const cleanStem = stem.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80);
+  const cleanExtension = extension.replace(/[^a-zA-Z0-9.]/g, "").slice(0, 12);
+
+  // A name of only dots or separators sanitizes down to nothing.
+  return (cleanStem || "upload") + cleanExtension;
+}
+
+/**
  * Initialize a new chunked upload
  * @param {Object} options - Upload options
  * @returns {Promise<Object>} - Upload metadata
@@ -44,6 +73,9 @@ async function initializeUpload(options) {
   const uploadMeta = {
     uploadId,
     filename,
+    // Only ever used to name the scratch file the chunks merge into; the
+    // original filename above is what reaches original_filename.
+    storageName: safeStorageName(filename),
     fileSize,
     mimeType,
     eventId,
@@ -146,7 +178,14 @@ async function completeUpload(uploadId) {
   const tempDir = path.join(getStoragePath(), 'temp', `merge_${Date.now()}_${Math.random().toString(36).substring(7)}`);
   await fs.mkdir(tempDir, { recursive: true });
 
-  const mergedFilePath = path.join(tempDir, uploadMeta.filename);
+  const mergedFilePath = path.join(tempDir, uploadMeta.storageName || safeStorageName(uploadMeta.filename));
+
+  // Belt and braces: the name above is already sanitized, so this can only
+  // fire if that ever regresses. Cheaper than trusting it silently.
+  const resolvedTempDir = path.resolve(tempDir);
+  if (path.resolve(mergedFilePath) !== path.join(resolvedTempDir, path.basename(mergedFilePath))) {
+    throw new Error("Refusing to merge outside the upload temp directory");
+  }
   const writeStream = require('fs').createWriteStream(mergedFilePath);
 
   try {
