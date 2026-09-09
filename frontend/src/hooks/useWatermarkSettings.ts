@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../config/api';
+import { getPublicSettings } from '../services/publicSettings';
 
 export function useWatermarkSettings() {
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
@@ -9,8 +10,8 @@ export function useWatermarkSettings() {
     const fetchSettings = async () => {
       try {
         // Use public settings endpoint that doesn't require authentication
-        const response = await api.get('/public/settings');
-        setWatermarkEnabled(response.data.branding_watermark_enabled || false);
+        const settings = await getPublicSettings();
+        setWatermarkEnabled(settings.branding_watermark_enabled || false);
       } catch (error) {
         console.error('Failed to fetch watermark settings:', error);
         // Default to false if we can't fetch settings

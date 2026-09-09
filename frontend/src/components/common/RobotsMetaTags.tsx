@@ -1,17 +1,14 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '../../utils/url';
+import { getPublicSettings } from '../../services/publicSettings';
 
 export const RobotsMetaTags: React.FC = () => {
   const { data: settings } = useQuery({
     queryKey: ['public-settings'],
     queryFn: async () => {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/public/settings`);
-        if (response.ok) {
-          return response.json();
-        }
-        return null;
+        return await getPublicSettings();
       } catch {
         return null;
       }

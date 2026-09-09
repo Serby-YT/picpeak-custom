@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl, buildResourceUrl } from '../../utils/url';
+import { getPublicSettings } from '../../services/publicSettings';
 
 const DEFAULT_TITLE = 'PicPeak - Photo Sharing Platform';
 
@@ -9,11 +10,7 @@ export const DynamicFavicon: React.FC = () => {
     queryKey: ['public-settings'],
     queryFn: async () => {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/public/settings`);
-        if (response.ok) {
-          return response.json();
-        }
-        return null;
+        return await getPublicSettings();
       } catch {
         return null;
       }

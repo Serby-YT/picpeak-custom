@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../config/api';
+import { getPublicSettings } from '../services/publicSettings';
 
 interface GlobalThemeProviderProps {
   children: React.ReactNode;
@@ -15,8 +16,7 @@ export const GlobalThemeProvider: React.FC<GlobalThemeProviderProps> = ({ childr
   const { data: settingsData } = useQuery({
     queryKey: ['global-theme-settings'],
     queryFn: async () => {
-      const response = await api.get('/public/settings');
-      return response.data;
+      return getPublicSettings();
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });

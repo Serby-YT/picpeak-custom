@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '../../utils/url';
+import { getPublicSettings } from '../../services/publicSettings';
 
 interface ReCaptchaProps {
   onChange: (token: string | null) => void;
@@ -21,8 +22,7 @@ export const ReCaptcha: React.FC<ReCaptchaProps> = ({
   const { data: settings } = useQuery({
     queryKey: ['public-settings'],
     queryFn: async () => {
-      const response = await fetch(`${getApiBaseUrl()}/public/settings`);
-      return response.json();
+      return getPublicSettings();
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../config/api';
 import { buildResourceUrl } from '../utils/url';
+import { getPublicSettings } from '../services/publicSettings';
 
 interface BrandingSettings {
   branding_company_name?: string;
@@ -23,8 +24,7 @@ export const MaintenanceMode: React.FC = () => {
     queryKey: ['public-settings-maintenance'],
     queryFn: async () => {
       try {
-        const response = await api.get('/public/settings');
-        return response.data;
+        return await getPublicSettings();
       } catch {
         // Return empty object if settings can't be fetched
         return {};

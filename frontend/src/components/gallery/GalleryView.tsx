@@ -23,6 +23,7 @@ import { galleryService } from '../../services/gallery.service';
 import { useWatermarkSettings } from '../../hooks/useWatermarkSettings';
 import { useGalleryCustomCss } from '../../hooks/useGalleryCustomCss';
 import type { Photo } from '../../types';
+import { getPublicSettings } from '../../services/publicSettings';
 
 interface GalleryViewProps {
   slug: string;
@@ -63,7 +64,24 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
   const [protectionLevel, setProtectionLevel] = useState<'basic' | 'standard' | 'enhanced' | 'maximum'>('standard');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'photo' | 'video'>('all');
-  const [guestId, setGuestId] = useState<string>('');
+  // Read synchronously on the first render rather than in an effect. This used
+  // to start as '' and be filled in afterwards, which changed the photos query
+  // key and made the gallery fetch its whole photo list a second time — 71KB,
+  // twice, on every visit. localStorage is synchronous, so there was never a
+  // reason to defer it.
+  const [guestId] = useState<string>(() => {
+    try {
+      let stored = localStorage.getItem('gallery_guest_id');
+      if (!stored) {
+        stored = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('gallery_guest_id', stored);
+      }
+      return stored;
+    } catch (error) {
+      // Private browsing can refuse storage; a per-render id is still usable.
+      return `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+  });
   const [staticHeroPhoto, setStaticHeroPhoto] = useState<Photo | null>(null);
 
   const resolveMediaType = (photo: Photo) => {
@@ -79,16 +97,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
     return 'photo';
   };
   
-  // Generate a unique guest ID for this session
-  useEffect(() => {
-    // Use existing guest ID from localStorage or generate new one
-    let storedGuestId = localStorage.getItem('gallery_guest_id');
-    if (!storedGuestId) {
-      storedGuestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('gallery_guest_id', storedGuestId);
-    }
-    setGuestId(storedGuestId);
-  }, []);
   
   // Fetch photos WITHOUT filter (always get all photos, filter on frontend)
   // This ensures counts are always calculated from the full dataset
@@ -166,8 +174,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
   const { data: settingsData } = useQuery({
     queryKey: ['gallery-settings'],
     queryFn: async () => {
-      const response = await api.get('/public/settings');
-      return response.data;
+      return getPublicSettings();
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
