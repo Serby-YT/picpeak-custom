@@ -240,7 +240,18 @@ export const MasonryGalleryLayout: React.FC<BaseGalleryLayoutProps> = ({
   const [columns, setColumns] = useState(3);
   const [containerWidth, setContainerWidth] = useState(0);
   const gallerySettings = theme.gallerySettings || {};
-  const gutter = gallerySettings.masonryGutter || 16;
+  const configuredGutter = gallerySettings.masonryGutter || 16;
+  // Tighter on a phone. The same gap that reads as breathing room across a wide
+  // screen takes a visible bite out of a 375px viewport, where each column is
+  // only about 168px wide — so the gallery is set by its spacing rather than by
+  // the photographs. Halved below the same 640px threshold the column count
+  // already uses, so the two stay in step, and floored so a small configured
+  // value cannot collapse to nothing. containerWidth is 0 until the container
+  // has been measured; the desktop value is used until then, matching how the
+  // column count already behaves.
+  const gutter = containerWidth > 0 && containerWidth < 640
+    ? Math.max(2, Math.round(configuredGutter / 2))
+    : configuredGutter;
   const mode = gallerySettings.masonryMode || 'columns';
   const targetRowHeight = gallerySettings.masonryRowHeight || 250;
   const lastRowBehavior = gallerySettings.masonryLastRowBehavior || 'left';
