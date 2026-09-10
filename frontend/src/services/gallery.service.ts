@@ -3,6 +3,24 @@ import type { GalleryInfo, GalleryData, GalleryStats, ResolvedGalleryIdentifier 
 import { normalizeRequirePassword } from '../utils/accessControl';
 import { buildResourceUrl } from '../utils/url';
 
+/**
+ * Keep the MIME type that came back with the response.
+ *
+ * With responseType 'blob' axios already returns a Blob whose type is taken
+ * from Content-Type. Re-wrapping it as `new Blob([response.data])` throws that
+ * away and produces a Blob of type "", which is what made Opera save a photo as
+ * Iubita_individual_0077.jpg.txt — it could not confirm the bytes matched the
+ * .jpg name, so it appended one it trusted. Chrome guessed and got it right,
+ * which is why this only showed up in Opera.
+ */
+const asTypedBlob = (response: { data: Blob; headers?: any }, fallbackType?: string): Blob => {
+  const headerType = response.headers?.['content-type'] || response.headers?.get?.('content-type');
+  const type = response.data?.type || headerType || fallbackType || 'application/octet-stream';
+  return response.data instanceof Blob && response.data.type
+    ? response.data
+    : new Blob([response.data], { type });
+};
+
 export const galleryService = {
   // Verify share token
   async verifyToken(slug: string, token: string): Promise<{ valid: boolean }> {
@@ -54,7 +72,7 @@ export const galleryService = {
       const response = await api.get(`/gallery/${slug}/download/${photoId}`, {
         responseType: 'blob',
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const url = window.URL.createObjectURL(asTypedBlob(response));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
@@ -68,7 +86,7 @@ export const galleryService = {
         const response = await api.get(`/gallery/${slug}/photo/${photoId}`, {
           responseType: 'blob',
         });
-        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const url = window.URL.createObjectURL(asTypedBlob(response));
         const link = document.createElement('a');
         link.href = url;
         link.setAttribute('download', filename);
@@ -100,10 +118,13 @@ export const galleryService = {
     // Authorization header the axios client would normally add.
     const link = document.createElement('a');
     link.href = buildResourceUrl(`/api/gallery/${encodeURIComponent(slug)}/download-all`);
-    // No value: let Content-Disposition name the file. The attribute is still
-    // needed so a non-attachment error response downloads harmlessly instead of
-    // navigating the visitor out of the gallery.
-    link.setAttribute('download', '');
+    // Name it explicitly rather than leaving the attribute empty. An empty
+    // download attribute asks the browser to fall back to Content-Disposition,
+    // but the URL path ends in /download-all with no extension, and Opera
+    // preferred to derive a name from that and then append .txt to it. Stating
+    // the name removes the guess. The server still sends the same filename in
+    // Content-Disposition, so nothing disagrees.
+    link.setAttribute('download', `${slug}.zip`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -119,7 +140,7 @@ export const galleryService = {
     // the filename. This path still buffers, because the selected ids travel
     // in a POST body and so cannot be a plain link, but a selection is a
     // handful of photos rather than the whole gallery.
-    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/zip' }));
+    const url = window.URL.createObjectURL(asTypedBlob(response, 'application/zip'));
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `${slug}-selected.zip`);

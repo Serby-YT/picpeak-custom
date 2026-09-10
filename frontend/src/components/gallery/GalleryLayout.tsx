@@ -443,7 +443,13 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
                 {headerExtra}
               </div>
 
-              {/* Right side - Action buttons */}
+              {/* Right side - Action buttons.
+                  Both are optional. A passwordless gallery has nothing to log
+                  out of, and Download All lives in the menu, so on these
+                  galleries neither renders — and the pill was still painted,
+                  leaving an empty translucent circle floating over the hero
+                  that looked like a button and did nothing. */}
+              {((showDownloadAll && onDownloadAll) || (showLogout && onLogout)) && (
               <div className="flex items-center gap-3 flex-shrink-0 bg-black/30 backdrop-blur-sm rounded-full px-2 py-2">
                 {/* Download all button */}
                 {showDownloadAll && onDownloadAll && (
@@ -473,6 +479,7 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
                   </Button>
                 )}
               </div>
+              )}
             </div>
           </div>
         )}
