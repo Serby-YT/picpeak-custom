@@ -55,6 +55,8 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
   isDownloading = false
 }) => {
   const { t } = useTranslation();
+  // HeroDivider renders nothing for these, so there is no shape to clear.
+  const hasVisibleDivider = !!dividerStyle && dividerStyle !== 'none' && dividerStyle !== 'straight';
   const { format } = useLocalizedDate();
   const { theme } = useTheme();
   const [heroPhoto, setHeroPhoto] = useState<Photo | null>(null);
@@ -164,9 +166,17 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
           </div>
         </div>
 
-        {/* Download All + Photographer Credit, stacked bottom-centre */}
+        {/* Download All + Photographer Credit, stacked bottom-centre.
+            The divider is drawn over the bottom of the hero at h-12 sm:h-16, so
+            sitting at bottom-3 put these underneath it and the wave cut straight
+            across the label. Clear the divider's height when one is drawn; sit
+            low when it is not, since 'none' and 'straight' render nothing. */}
         {(photographerName || (allowDownloads && onDownloadAll)) && (
-          <div className="absolute bottom-3 sm:bottom-5 inset-x-0 flex flex-col items-center gap-2 sm:gap-3">
+          <div
+            className={`absolute inset-x-0 flex flex-col items-center gap-2 sm:gap-3 ${
+              hasVisibleDivider ? 'bottom-16 sm:bottom-20' : 'bottom-3 sm:bottom-5'
+            }`}
+          >
             {allowDownloads && onDownloadAll && (
               <button
                 type="button"
