@@ -571,7 +571,11 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
       )}
 
       {/* Main Content */}
-      <main className="w-full px-4 sm:px-6 lg:px-8">{children}</main>
+      {/* px-2 below sm: with the grid gutter now 4px on a phone, a 16px margin
+          on each side was four times the gap between the photographs and the
+          largest single consumer of a 375px viewport. Unchanged from sm up,
+          where the screen can afford it. */}
+      <main className="w-full px-2 sm:px-6 lg:px-8">{children}</main>
 
       {/* Footer */}
       <footer className="gallery-footer mt-8 sm:mt-12 py-6 sm:py-8 border-t border-surface">
