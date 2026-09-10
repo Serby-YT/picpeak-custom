@@ -42,6 +42,8 @@ interface PhotoGridWithLayoutsProps {
   expiresAt?: string | null;
   feedbackEnabled?: boolean;
   allowDownloads?: boolean;
+  onDownloadAll?: () => void;
+  isDownloading?: boolean;
   protectionLevel?: 'basic' | 'standard' | 'enhanced' | 'maximum';
   useEnhancedProtection?: boolean;
   useCanvasRendering?: boolean;
@@ -81,6 +83,8 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
   feedbackOptions,
   onFeedbackChange,
   allowDownloads = true,
+  onDownloadAll,
+  isDownloading = false,
   protectionLevel = 'standard',
   useEnhancedProtection = false,
   useCanvasRendering = false,
@@ -292,6 +296,8 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
           useCanvasRendering={useCanvasRendering}
           heroImageAnchor={heroImageAnchor}
           photographerName={photographerName}
+          onDownloadAll={onDownloadAll}
+          isDownloading={isDownloading}
         />
       )}
 

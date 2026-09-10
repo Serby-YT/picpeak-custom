@@ -438,7 +438,7 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
           <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
             <div className="flex items-center justify-between">
               {/* Left side - Menu button */}
-              <div className="flex items-center gap-1.5 sm:gap-3 bg-black/30 backdrop-blur-sm rounded-full px-1 py-1 sm:px-2 sm:py-2">
+              <div className="gallery-hero-controls flex items-center gap-1.5 sm:gap-3 bg-black/30 backdrop-blur-sm rounded-full px-1 py-1 sm:px-2 sm:py-2">
                 {menuButton}
                 {headerExtra}
               </div>
@@ -450,7 +450,7 @@ export const GalleryLayout: React.FC<GalleryLayoutProps> = ({
                   leaving an empty translucent circle floating over the hero
                   that looked like a button and did nothing. */}
               {((showDownloadAll && onDownloadAll) || (showLogout && onLogout)) && (
-              <div className="flex items-center gap-3 flex-shrink-0 bg-black/30 backdrop-blur-sm rounded-full px-2 py-2">
+              <div className="gallery-hero-controls flex items-center gap-3 flex-shrink-0 bg-black/30 backdrop-blur-sm rounded-full px-2 py-2">
                 {/* Download all button */}
                 {showDownloadAll && onDownloadAll && (
                   <Button

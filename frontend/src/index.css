@@ -506,3 +506,54 @@
     transform: none;
   }
 }
+
+
+/* Controls that sit on top of the hero photograph.
+   Unlayered and slightly more specific than the utilities on purpose: these
+   have to win over the ghost button's own hover colours. */
+
+/* The ghost variant's text is a dark neutral meant for a light page. Over a
+   photograph it vanished — MENU was unreadable on a retina screen. This is the
+   same off-white the portfolio uses for text over images, with the tracking its
+   small uppercase labels carry. */
+.gallery-hero-controls button.btn {
+  color: #f7f5f1;
+  letter-spacing: 1.5px;
+}
+
+.gallery-hero-controls button.btn:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Download All, offered on the hero itself rather than only in the menu.
+   Same off-white and uppercase treatment as the portfolio's small pill labels,
+   over a dark scrim so it stays readable on a bright photograph. */
+.gallery-hero-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(247, 245, 241, 0.35);
+  background-color: rgba(8, 9, 10, 0.55);
+  backdrop-filter: blur(6px);
+  color: #f7f5f1;
+  font-size: 0.8rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.gallery-hero-download:hover:not(:disabled) {
+  background-color: rgba(8, 9, 10, 0.75);
+  border-color: rgba(247, 245, 241, 0.6);
+}
+
+.gallery-hero-download:disabled {
+  opacity: 0.65;
+  cursor: default;
+}

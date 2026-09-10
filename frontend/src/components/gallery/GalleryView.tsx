@@ -597,6 +597,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
           slug={slug}
           categoryId={selectedCategoryId}
           onFeedbackChange={() => refetch()}
+          onDownloadAll={handleDownloadAll}
+          isDownloading={downloadAllMutation.isPending}
           heroPhotoOverride={staticHeroPhoto}
           feedbackEnabled={feedbackEnabled}
           feedbackOptions={{
@@ -783,6 +785,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
             slug={slug} 
             categoryId={selectedCategoryId}
             onFeedbackChange={() => refetch()}
+            onDownloadAll={handleDownloadAll}
+            isDownloading={downloadAllMutation.isPending}
             heroPhotoOverride={staticHeroPhoto}
             feedbackEnabled={feedbackEnabled}
             feedbackOptions={{

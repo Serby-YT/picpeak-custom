@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar } from 'lucide-react';
+import { Calendar, Download } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedDate } from '../../hooks/useLocalizedDate';
@@ -31,6 +31,10 @@ interface HeroHeaderProps {
   heroImageAnchor?: string;
   // Photographer/studio name credit shown bottom-center of the hero
   photographerName?: string;
+  // Download the whole gallery, offered on the hero itself so a client does not
+  // have to find it in the menu.
+  onDownloadAll?: () => void;
+  isDownloading?: boolean;
 }
 
 export const HeroHeader: React.FC<HeroHeaderProps> = ({
@@ -46,7 +50,9 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
   useEnhancedProtection = false,
   useCanvasRendering = false,
   heroImageAnchor = 'center',
-  photographerName
+  photographerName,
+  onDownloadAll,
+  isDownloading = false
 }) => {
   const { t } = useTranslation();
   const { format } = useLocalizedDate();
@@ -158,12 +164,25 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
           </div>
         </div>
 
-        {/* Photographer Credit */}
-        {photographerName && (
-          <div className="absolute bottom-3 sm:bottom-5 inset-x-0 flex justify-center">
-            <span className="text-white/80 text-xs sm:text-sm drop-shadow-lg">
-              {photographerName}
-            </span>
+        {/* Download All + Photographer Credit, stacked bottom-centre */}
+        {(photographerName || (allowDownloads && onDownloadAll)) && (
+          <div className="absolute bottom-3 sm:bottom-5 inset-x-0 flex flex-col items-center gap-2 sm:gap-3">
+            {allowDownloads && onDownloadAll && (
+              <button
+                type="button"
+                onClick={onDownloadAll}
+                disabled={isDownloading}
+                className="gallery-hero-download"
+              >
+                <Download className="w-4 h-4" aria-hidden="true" />
+                <span>{isDownloading ? t('gallery.preparingDownload') : t('gallery.downloadAll')}</span>
+              </button>
+            )}
+            {photographerName && (
+              <span className="text-white/80 text-xs sm:text-sm drop-shadow-lg">
+                {photographerName}
+              </span>
+            )}
           </div>
         )}
 

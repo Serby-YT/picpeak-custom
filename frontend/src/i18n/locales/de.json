@@ -749,7 +749,8 @@
       "postComment": "Kommentar posten",
       "anonymous": "Anonym"
     },
-    "slideshow": "Diashow"
+    "slideshow": "Diashow",
+    "preparingDownload": "Wird vorbereitet…"
   },
   "categories": {
     "title": "Fotokategorien",

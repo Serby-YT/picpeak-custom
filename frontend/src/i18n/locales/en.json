@@ -304,7 +304,8 @@
       "postComment": "Post Comment",
       "anonymous": "Anonymous"
     },
-    "slideshow": "Slideshow"
+    "slideshow": "Slideshow",
+    "preparingDownload": "Preparing…"
   },
   "categories": {
     "title": "Photo Categories",
