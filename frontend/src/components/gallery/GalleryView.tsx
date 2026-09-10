@@ -701,12 +701,20 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
           <Button
             variant="ghost"
             size="sm"
-            className="gallery-btn"
-            leftIcon={<Menu className="w-4 h-4" />}
+            /* Icon-only below sm, so it has to be square there. The label is
+               hidden on mobile but btn-sm keeps its px-3, and Button's leftIcon
+               always carries an mr-2 meant to separate it from that label — so
+               the button came out 48x36 with the glyph sitting 8px left of
+               centre, and the round pill around it read as a squashed ellipse.
+               Dropping the padding and pinning the aspect ratio keeps it round;
+               moving the icon out of leftIcon removes the stray margin, and the
+               label carries its own spacing only where it is visible. */
+            className="gallery-btn !px-0 aspect-square sm:aspect-auto sm:!px-3"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={t('gallery.toggleMenu')}
           >
-            <span className="hidden sm:inline">{t('common.menu')}</span>
+            <Menu className="w-4 h-4" />
+            <span className="hidden sm:inline sm:ml-2">{t('common.menu')}</span>
           </Button>
         ) : undefined}
         headerExtra={(() => {
