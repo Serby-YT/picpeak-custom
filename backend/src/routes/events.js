@@ -6,6 +6,7 @@ const { db } = require('../database/db');
 const { formatBoolean } = require('../utils/dbCompat');
 const { validatePasswordInContext, getBcryptRounds } = require('../utils/passwordValidation');
 const { adminAuth } = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/permissions');
 const fs = require('fs').promises;
 const path = require('path');
 const router = express.Router();
@@ -56,7 +57,7 @@ const hasCustomerContactColumns = async () => {
 };
 
 // Create new event
-router.post('/', adminAuth, [
+router.post('/', adminAuth, requireSuperAdmin(), [
   body('event_type').notEmpty().trim().custom(async (value) => {
     const isValid = await eventTypeService.isValidEventType(value);
     if (!isValid) {
@@ -207,7 +208,7 @@ router.post('/', adminAuth, [
 });
 
 // Get all events (admin)
-router.get('/', adminAuth, async (req, res) => {
+router.get('/', adminAuth, requireSuperAdmin(), async (req, res) => {
   try {
     const { status = 'all' } = req.query;
     
@@ -234,7 +235,7 @@ router.get('/', adminAuth, async (req, res) => {
 });
 
 // Update event
-router.put('/:id', adminAuth, [
+router.put('/:id', adminAuth, requireSuperAdmin(), [
   body('customer_name').optional().trim().notEmpty(),
   body('customer_email').optional().isEmail().normalizeEmail(),
   body('require_password').optional().isBoolean()
@@ -330,7 +331,7 @@ router.put('/:id', adminAuth, [
 });
 
 // Delete event (mark as inactive)
-router.delete('/:id', adminAuth, async (req, res) => {
+router.delete('/:id', adminAuth, requireSuperAdmin(), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -343,7 +344,7 @@ router.delete('/:id', adminAuth, async (req, res) => {
 });
 
 // Extend expiration
-router.post('/:id/extend', adminAuth, [
+router.post('/:id/extend', adminAuth, requireSuperAdmin(), [
   body('days').isInt({ min: 1, max: 365 })
 ], async (req, res) => {
   try {

@@ -87,6 +87,21 @@ router.post('/:slug/generate-token', async (req, res, next) => {
  */
 router.get('/:slug/secure/:photoId/:token', 
   secureImageMiddleware.secureImageAccess,
+  // Security backport (upstream GHSA-g94x-8vv8-3c9f): this route used to skip
+  // the gallery check entirely, so a token from any public gallery could read a
+  // password-protected one. Same guard as the download route below.
+  (req, res, next) => {
+    req.requestedSlug = req.params.slug;
+    // verifyGalleryAccess replaces req.clientInfo for public galleries; the
+    // token check below needs the fingerprint secureImageAccess computed.
+    req.secureClientInfo = req.clientInfo;
+    next();
+  },
+  verifyGalleryAccess,
+  (req, res, next) => {
+    req.clientInfo = req.secureClientInfo || req.clientInfo;
+    next();
+  },
   async (req, res) => {
     const { slug, photoId, token } = req.params; // Move outside try block for error handler access
     
@@ -114,6 +129,11 @@ router.get('/:slug/secure/:photoId/:token',
           req.clientInfo,
           'token_invalid'
         );
+        return res.status(403).json({ error: 'Invalid or expired token' });
+      }
+
+      // A token is minted for one photo; refuse it for any other.
+      if (Number(tokenValidation.data?.photoId) !== Number(photoId)) {
         return res.status(403).json({ error: 'Invalid or expired token' });
       }
 

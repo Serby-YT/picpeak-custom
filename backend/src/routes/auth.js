@@ -327,6 +327,15 @@ router.post('/gallery/share-login', [
       return res.status(401).json({ error: 'Invalid or expired share link' });
     }
 
+    // Security backport (upstream GHSA-9hmx-68vc-qpqw): a share link alone must
+    // never unlock a password-protected gallery. No token, no cookie; the
+    // frontend sees no `event` and shows the password screen, which goes
+    // through /gallery/verify and its bcrypt check.
+    const shareRequiresPassword = !(event.require_password === false || event.require_password === 0 || event.require_password === '0');
+    if (shareRequiresPassword) {
+      return res.json({ requires_password: true });
+    }
+
     const jwtToken = jwt.sign({
       eventId: event.id,
       eventSlug: event.slug,
