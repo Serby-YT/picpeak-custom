@@ -43,6 +43,9 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
 
   // Last photo clicked without Shift; Shift+click selects everything between it and the target
   const anchorIdRef = useRef<number | null>(null);
+  // macOS turns Ctrl+left-click into a contextmenu event; remember the press so it selects instead
+  const ctrlLeftPressIdRef = useRef<number | null>(null);
+  const toggledViaContextMenuIdRef = useRef<number | null>(null);
 
   const handlePhotoSelect = (photoId: number, e?: React.MouseEvent) => {
     if (e) {
@@ -77,6 +80,17 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
   };
 
   const handleTileClick = (photo: AdminPhoto, index: number, e: React.MouseEvent) => {
+    // Ctrl/Cmd+click adds or removes one photo, like Finder / File Explorer
+    if (e.ctrlKey || e.metaKey) {
+      e.stopPropagation();
+      // Some browsers fire click after the contextmenu that already toggled it
+      if (toggledViaContextMenuIdRef.current === photo.id) {
+        toggledViaContextMenuIdRef.current = null;
+        return;
+      }
+      handlePhotoSelect(photo.id);
+      return;
+    }
     // In selection mode the whole tile selects, since the checkbox is a small target
     if (isSelectionMode || e.shiftKey) {
       handlePhotoSelect(photo.id, e);
@@ -90,6 +104,12 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
   const handleContextMenu = (photo: AdminPhoto, index: number, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (ctrlLeftPressIdRef.current === photo.id) {
+      ctrlLeftPressIdRef.current = null;
+      toggledViaContextMenuIdRef.current = photo.id;
+      handlePhotoSelect(photo.id);
+      return;
+    }
     setContextMenu({ x: e.clientX, y: e.clientY, photo, index });
   };
 
@@ -102,6 +122,12 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
     if (e.shiftKey) {
       e.preventDefault();
     }
+  };
+
+  const handleTileMouseDown = (photo: AdminPhoto, e: React.MouseEvent) => {
+    preventShiftTextSelection(e);
+    toggledViaContextMenuIdRef.current = null;
+    ctrlLeftPressIdRef.current = e.button === 0 && e.ctrlKey ? photo.id : null;
   };
 
   const handleSelectAll = () => {
@@ -264,7 +290,7 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
               )}
 
               <span className="hidden md:inline text-xs text-neutral-500 dark:text-neutral-400">
-                {t('gallery.shiftClickHint', 'Shift+click to select a range')}
+                {t('gallery.shiftClickHint', 'Shift+click for a range · Ctrl/⌘+click to add or remove')}
               </span>
             </>
           )}
@@ -292,7 +318,7 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
               className={`relative group cursor-pointer rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800 transition-opacity ${
                 isSelectionMode ? 'ring-2 ring-offset-2 ' + (selectedPhotos.has(photo.id) ? 'ring-primary-500' : 'ring-transparent') : ''
               } ${isDeleting ? 'opacity-50' : ''}`}
-              onMouseDown={preventShiftTextSelection}
+              onMouseDown={(e) => handleTileMouseDown(photo, e)}
               onClick={(e) => !isDeleting && handleTileClick(photo, index, e)}
               onContextMenu={(e) => !isDeleting && handleContextMenu(photo, index, e)}
           >

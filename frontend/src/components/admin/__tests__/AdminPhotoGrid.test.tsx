@@ -175,9 +175,9 @@ describe('AdminPhotoGrid shift+click range selection', () => {
 
   it('shows the shift+click hint in selection mode', () => {
     renderGrid();
-    expect(screen.queryByText('Shift+click to select a range')).not.toBeInTheDocument();
+    expect(screen.queryByText('Shift+click for a range · Ctrl/⌘+click to add or remove')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Select Photos'));
-    expect(screen.getByText('Shift+click to select a range')).toBeInTheDocument();
+    expect(screen.getByText('Shift+click for a range · Ctrl/⌘+click to add or remove')).toBeInTheDocument();
   });
 
   it('shift+mousedown is prevented so page text does not get highlighted', () => {
@@ -342,5 +342,89 @@ describe('AdminPhotoGrid right-click menu', () => {
 
     expect(parseFloat(el.style.left)).toBeLessThanOrEqual(window.innerWidth);
     expect(parseFloat(el.style.top)).toBeLessThanOrEqual(window.innerHeight);
+  });
+});
+
+describe('AdminPhotoGrid Ctrl/Cmd+click', () => {
+  it('Ctrl+click toggles photos without opening the viewer', () => {
+    const { onPhotoClick } = renderGrid();
+    fireEvent.click(tile(2), { ctrlKey: true });
+    fireEvent.click(tile(5), { ctrlKey: true });
+    fireEvent.click(tile(9), { ctrlKey: true });
+    expect(checkedIds(10)).toEqual([2, 5, 9]);
+
+    fireEvent.click(tile(5), { ctrlKey: true });
+    expect(checkedIds(10)).toEqual([2, 9]);
+    expect(onPhotoClick).not.toHaveBeenCalled();
+    expect(screen.getByText('Cancel Selection')).toBeInTheDocument();
+  });
+
+  it('Cmd+click toggles photos', () => {
+    const { onPhotoClick } = renderGrid();
+    fireEvent.click(tile(3), { metaKey: true });
+    fireEvent.click(tile(7), { metaKey: true });
+
+    expect(checkedIds(10)).toEqual([3, 7]);
+    expect(onPhotoClick).not.toHaveBeenCalled();
+  });
+
+  it('Mac Ctrl+left-click (arrives as contextmenu) selects instead of opening the menu', () => {
+    renderGrid();
+    fireEvent.mouseDown(tile(4), { button: 0, ctrlKey: true });
+    fireEvent.contextMenu(tile(4), { button: 0, ctrlKey: true });
+
+    expect(menu()).not.toBeInTheDocument();
+    expect(checkedIds(10)).toEqual([4]);
+  });
+
+  it('a contextmenu + click pair from one Ctrl+click toggles only once', () => {
+    renderGrid();
+    fireEvent.mouseDown(tile(4), { button: 0, ctrlKey: true });
+    fireEvent.contextMenu(tile(4), { button: 0, ctrlKey: true });
+    fireEvent.click(tile(4), { ctrlKey: true });
+
+    expect(checkedIds(10)).toEqual([4]);
+  });
+
+  it('a real right-click still opens the menu, even with Ctrl held', () => {
+    renderGrid();
+    fireEvent.mouseDown(tile(4), { button: 2, ctrlKey: true });
+    fireEvent.contextMenu(tile(4), { button: 2, ctrlKey: true });
+
+    expect(menu()).toBeInTheDocument();
+    expect(checkedIds(10)).toEqual([]);
+  });
+
+  it('right-click after an earlier Ctrl+click still opens the menu', () => {
+    renderGrid();
+    fireEvent.mouseDown(tile(4), { button: 0, ctrlKey: true });
+    fireEvent.contextMenu(tile(4), { button: 0, ctrlKey: true });
+    fireEvent.mouseDown(tile(4), { button: 2 });
+    fireEvent.contextMenu(tile(4), { button: 2 });
+
+    expect(menu()).toBeInTheDocument();
+  });
+
+  it('Ctrl+click sets the anchor for a following Shift+click', () => {
+    renderGrid();
+    fireEvent.click(tile(1), { ctrlKey: true });
+    fireEvent.click(tile(3), { ctrlKey: true });
+    fireEvent.click(tile(6), { shiftKey: true });
+
+    expect(checkedIds(10)).toEqual([1, 3, 4, 5, 6]);
+  });
+
+  it('Ctrl-selected photos can be moved together from the right-click menu', async () => {
+    renderGrid();
+    fireEvent.click(tile(2), { ctrlKey: true });
+    fireEvent.click(tile(8), { metaKey: true });
+    fireEvent.mouseDown(tile(8), { button: 2 });
+    fireEvent.contextMenu(tile(8), { button: 2 });
+    fireEvent.click(menuItem('Photoshoot'));
+
+    await waitFor(() => expect(photosService.updatePhotosCategory).toHaveBeenCalledTimes(1));
+    const [, ids, categoryId] = vi.mocked(photosService.updatePhotosCategory).mock.calls[0];
+    expect([...ids].sort((a, b) => a - b)).toEqual([2, 8]);
+    expect(categoryId).toBe(11);
   });
 });
