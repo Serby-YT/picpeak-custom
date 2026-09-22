@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Check, Download, Trash2, Eye, Package, MessageSquare, Star, Video, FolderOpen } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +39,9 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isUpdatingCategory, setIsUpdatingCategory] = useState(false);
 
+  // Last photo clicked without Shift; Shift+click selects everything between it and the target
+  const anchorIdRef = useRef<number | null>(null);
+
   const handlePhotoSelect = (photoId: number, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
@@ -48,13 +51,43 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
       setIsSelectionMode(true);
     }
     const newSelected = new Set(selectedPhotos);
-    if (newSelected.has(photoId)) {
+    const anchorIndex = anchorIdRef.current === null
+      ? -1
+      : photos.findIndex(p => p.id === anchorIdRef.current);
+    const targetIndex = photos.findIndex(p => p.id === photoId);
+
+    if (e?.shiftKey && anchorIndex !== -1 && targetIndex !== -1) {
+      // Finder-style range: additive, in grid order, either direction
+      const [start, end] = anchorIndex < targetIndex
+        ? [anchorIndex, targetIndex]
+        : [targetIndex, anchorIndex];
+      for (let i = start; i <= end; i++) {
+        newSelected.add(photos[i].id);
+      }
+    } else if (newSelected.has(photoId)) {
       newSelected.delete(photoId);
     } else {
       newSelected.add(photoId);
     }
+    anchorIdRef.current = photoId;
     setSelectedPhotos(newSelected);
     onSelectionChange?.(Array.from(newSelected));
+  };
+
+  const handleTileClick = (photo: AdminPhoto, index: number, e: React.MouseEvent) => {
+    // In selection mode the whole tile selects, since the checkbox is a small target
+    if (isSelectionMode || e.shiftKey) {
+      handlePhotoSelect(photo.id, e);
+      return;
+    }
+    onPhotoClick(photo, index);
+  };
+
+  // Stop Shift+click from highlighting text across the grid
+  const preventShiftTextSelection = (e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+    }
   };
 
   const handleSelectAll = () => {
@@ -211,10 +244,14 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
                   </button>
                 </>
               )}
+
+              <span className="hidden md:inline text-xs text-neutral-500 dark:text-neutral-400">
+                {t('gallery.shiftClickHint', 'Shift+click to select a range')}
+              </span>
             </>
           )}
         </div>
-        
+
         <div className="text-sm text-neutral-600 dark:text-neutral-400">
           {t('gallery.photosCount', { count: photos.length })}
         </div>
@@ -237,7 +274,8 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
               className={`relative group cursor-pointer rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800 transition-opacity ${
                 isSelectionMode ? 'ring-2 ring-offset-2 ' + (selectedPhotos.has(photo.id) ? 'ring-primary-500' : 'ring-transparent') : ''
               } ${isDeleting ? 'opacity-50' : ''}`}
-              onClick={() => !isDeleting && onPhotoClick(photo, index)}
+              onMouseDown={preventShiftTextSelection}
+              onClick={(e) => !isDeleting && handleTileClick(photo, index, e)}
           >
             {/* Selection Checkbox (top-right) */}
             <button
@@ -249,6 +287,7 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
               className={`absolute top-2 right-2 z-20 transition-opacity ${
                 selectedPhotos.has(photo.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
               }`}
+              onMouseDown={preventShiftTextSelection}
               onClick={(e) => handlePhotoSelect(photo.id, e)}
             >
               <div className={`w-6 h-6 rounded border-2 flex items-center justify-center ${
