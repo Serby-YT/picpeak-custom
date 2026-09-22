@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Check, Download, Trash2, Eye, Package, MessageSquare, Star, Video, FolderOpen } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { photosService } from '../../services/photos.service';
 import { Button } from '../common';
 import { AdminAuthenticatedImage } from './AdminAuthenticatedImage';
 import { BulkCategoryModal } from './BulkCategoryModal';
+import { PhotoContextMenu } from './PhotoContextMenu';
 
 interface CategoryOption {
   id: number;
@@ -38,6 +39,7 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
   const [deletingPhotos, setDeletingPhotos] = useState<Set<number>>(new Set());
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isUpdatingCategory, setIsUpdatingCategory] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; photo: AdminPhoto; index: number } | null>(null);
 
   // Last photo clicked without Shift; Shift+click selects everything between it and the target
   const anchorIdRef = useRef<number | null>(null);
@@ -83,6 +85,18 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
     onPhotoClick(photo, index);
   };
 
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  const handleContextMenu = (photo: AdminPhoto, index: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, photo, index });
+  };
+
+  // Right-clicking a selected photo acts on the whole selection, otherwise on that photo only
+  const contextTargetsSelection = contextMenu !== null && selectedPhotos.has(contextMenu.photo.id);
+  const contextTargetCount = contextTargetsSelection ? selectedPhotos.size : 1;
+
   // Stop Shift+click from highlighting text across the grid
   const preventShiftTextSelection = (e: React.MouseEvent) => {
     if (e.shiftKey) {
@@ -101,8 +115,8 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
     onSelectionChange?.(Array.from(newSelected));
   };
 
-  const handleDeleteSingle = async (photo: AdminPhoto, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteSingle = async (photo: AdminPhoto, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     
     if (!confirm(`Are you sure you want to delete "${photo.filename}"?`)) {
       return;
@@ -150,8 +164,8 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
     }
   };
 
-  const handleDownload = async (photo: AdminPhoto, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDownload = async (photo: AdminPhoto, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     try {
       await photosService.downloadPhoto(eventId, photo.id, photo.filename);
       toast.success('Download started');
@@ -168,11 +182,13 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
     }
   };
 
-  const handleMoveToCategory = async (categoryId: number | null) => {
-    if (selectedPhotos.size === 0) return;
+  // ids defaults to the current selection; the right-click menu can pass a single photo instead
+  const handleMoveToCategory = async (categoryId: number | null, ids?: number[]) => {
+    const selectedIds = ids ?? Array.from(selectedPhotos);
+    if (selectedIds.length === 0) return;
+    const movingSelection = !ids;
 
     setIsUpdatingCategory(true);
-    const selectedIds = Array.from(selectedPhotos);
 
     try {
       await photosService.updatePhotosCategory(eventId, selectedIds, categoryId);
@@ -185,9 +201,11 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
           category: categoryName
         })
       );
-      setSelectedPhotos(new Set());
-      setIsSelectionMode(false);
-      onSelectionChange?.([]);
+      if (movingSelection) {
+        setSelectedPhotos(new Set());
+        setIsSelectionMode(false);
+        onSelectionChange?.([]);
+      }
       setIsCategoryModalOpen(false);
       onPhotosDeleted(); // Refresh the photo list
     } catch {
@@ -276,6 +294,7 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
               } ${isDeleting ? 'opacity-50' : ''}`}
               onMouseDown={preventShiftTextSelection}
               onClick={(e) => !isDeleting && handleTileClick(photo, index, e)}
+              onContextMenu={(e) => !isDeleting && handleContextMenu(photo, index, e)}
           >
             {/* Selection Checkbox (top-right) */}
             <button
@@ -410,6 +429,33 @@ export const AdminPhotoGrid: React.FC<AdminPhotoGridProps> = ({
         categories={categories}
         isLoading={isUpdatingCategory}
       />
+
+      {contextMenu && (
+        <PhotoContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          title={contextTargetsSelection
+            ? t('gallery.photosSelected', { count: selectedPhotos.size })
+            : contextMenu.photo.filename}
+          targetCount={contextTargetCount}
+          isSelected={selectedPhotos.has(contextMenu.photo.id)}
+          currentCategoryId={!contextTargetsSelection && contextMenu.photo.category_id != null
+            ? Number(contextMenu.photo.category_id)
+            : null}
+          categories={categories}
+          onOpen={() => onPhotoClick(contextMenu.photo, contextMenu.index)}
+          onToggleSelect={() => handlePhotoSelect(contextMenu.photo.id)}
+          onMoveToCategory={(categoryId) => handleMoveToCategory(
+            categoryId,
+            contextTargetsSelection ? undefined : [contextMenu.photo.id]
+          )}
+          onDownload={() => handleDownload(contextMenu.photo)}
+          onDelete={() => contextTargetsSelection
+            ? handleDeleteSelected()
+            : handleDeleteSingle(contextMenu.photo)}
+          onClose={closeContextMenu}
+        />
+      )}
     </div>
   );
 };

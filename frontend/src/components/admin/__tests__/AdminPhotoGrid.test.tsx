@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { vi } from 'vitest';
 
 import { AdminPhotoGrid } from '../AdminPhotoGrid';
+import { photosService } from '../../../services/photos.service';
 import type { AdminPhoto } from '../../../services/photos.service';
 
 vi.mock('react-i18next', async () => {
@@ -20,9 +21,10 @@ vi.mock('../AdminAuthenticatedImage', () => ({
 
 vi.mock('../../../services/photos.service', () => ({
   photosService: {
-    deletePhotos: vi.fn(),
-    updatePhotosCategory: vi.fn(),
-    downloadPhoto: vi.fn(),
+    deletePhoto: vi.fn().mockResolvedValue(undefined),
+    deletePhotos: vi.fn().mockResolvedValue(undefined),
+    updatePhotosCategory: vi.fn().mockResolvedValue(undefined),
+    downloadPhoto: vi.fn().mockResolvedValue(undefined),
     formatBytes: () => "1 MB"
   }
 }));
@@ -40,20 +42,35 @@ const isChecked = (id: number) => checkbox(id).getAttribute('aria-checked') === 
 const checkedIds = (count: number) =>
   Array.from({ length: count }, (_, i) => i + 1).filter(isChecked);
 
+const categories = [
+  { id: 11, name: 'Photoshoot' },
+  { id: 12, name: 'Party' }
+];
+
 const renderGrid = (photos = makePhotos(10)) => {
   const onPhotoClick = vi.fn();
   const onSelectionChange = vi.fn();
+  const onPhotosDeleted = vi.fn();
   const utils = render(
     <AdminPhotoGrid
       photos={photos}
       eventId={1}
       onPhotoClick={onPhotoClick}
-      onPhotosDeleted={vi.fn()}
+      onPhotosDeleted={onPhotosDeleted}
       onSelectionChange={onSelectionChange}
+      categories={categories}
     />
   );
-  return { ...utils, onPhotoClick, onSelectionChange };
+  return { ...utils, onPhotoClick, onSelectionChange, onPhotosDeleted };
 };
+
+const menu = () => screen.queryByTestId('photo-context-menu');
+const menuItem = (name: string) =>
+  within(screen.getByTestId('photo-context-menu')).getByRole('menuitem', { name });
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('AdminPhotoGrid shift+click range selection', () => {
   it('selects every photo between the anchor and the shift-clicked photo', () => {
@@ -181,4 +198,149 @@ describe('AdminPhotoGrid shift+click range selection', () => {
     expect(isChecked(400)).toBe(true);
     expect(screen.getByText('Move to Category')).toBeInTheDocument();
   }, 30000);
+});
+
+describe('AdminPhotoGrid right-click menu', () => {
+  it('opens a menu on right-click and suppresses the browser menu', () => {
+    renderGrid();
+    const notPrevented = fireEvent.contextMenu(tile(3), { clientX: 100, clientY: 120 });
+
+    expect(notPrevented).toBe(false);
+    expect(menu()).toBeInTheDocument();
+    expect(within(menu()!).getByText('photo-3.jpg')).toBeInTheDocument();
+    expect(menuItem('Photoshoot')).toBeInTheDocument();
+    expect(menuItem('Party')).toBeInTheDocument();
+    expect(menuItem('Uncategorized')).toBeInTheDocument();
+  });
+
+  it('moves ALL selected photos when right-clicking a selected photo', async () => {
+    const { onSelectionChange, onPhotosDeleted } = renderGrid();
+    fireEvent.click(checkbox(2));
+    fireEvent.click(checkbox(5), { shiftKey: true });
+
+    fireEvent.contextMenu(tile(4));
+    fireEvent.click(menuItem('Party'));
+
+    await waitFor(() => expect(photosService.updatePhotosCategory).toHaveBeenCalledTimes(1));
+    const [eventId, ids, categoryId] = vi.mocked(photosService.updatePhotosCategory).mock.calls[0];
+    expect(eventId).toBe(1);
+    expect([...ids].sort((a, b) => a - b)).toEqual([2, 3, 4, 5]);
+    expect(categoryId).toBe(12);
+    expect(menu()).not.toBeInTheDocument();
+    await waitFor(() => expect(onPhotosDeleted).toHaveBeenCalled());
+    expect(onSelectionChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('moves only the right-clicked photo when it is not selected, keeping the selection', async () => {
+    renderGrid();
+    fireEvent.click(checkbox(1));
+    fireEvent.click(checkbox(2));
+
+    fireEvent.contextMenu(tile(7));
+    fireEvent.click(menuItem('Photoshoot'));
+
+    await waitFor(() =>
+      expect(photosService.updatePhotosCategory).toHaveBeenCalledWith(1, [7], 11)
+    );
+    expect(checkedIds(10)).toEqual([1, 2]);
+  });
+
+  it('can move photos back to Uncategorized', async () => {
+    renderGrid();
+    fireEvent.contextMenu(tile(4));
+    fireEvent.click(menuItem('Uncategorized'));
+
+    await waitFor(() =>
+      expect(photosService.updatePhotosCategory).toHaveBeenCalledWith(1, [4], null)
+    );
+  });
+
+  it('marks the current category of a single photo', () => {
+    const photos = makePhotos(3);
+    (photos[1] as unknown as { category_id: string }).category_id = '12';
+    renderGrid(photos);
+    fireEvent.contextMenu(tile(2));
+
+    expect(menuItem('Party').querySelector('svg')).not.toBeNull();
+    expect(menuItem('Photoshoot').querySelector('svg')).toBeNull();
+  });
+
+  it('Open opens the viewer on that photo', () => {
+    const { onPhotoClick } = renderGrid();
+    fireEvent.contextMenu(tile(6));
+    fireEvent.click(menuItem('Open'));
+
+    expect(onPhotoClick).toHaveBeenCalledWith(expect.objectContaining({ id: 6 }), 5);
+    expect(menu()).not.toBeInTheDocument();
+  });
+
+  it('Select then Deselect toggles the photo', () => {
+    renderGrid();
+    fireEvent.contextMenu(tile(6));
+    fireEvent.click(menuItem('Select'));
+    expect(checkedIds(10)).toEqual([6]);
+
+    fireEvent.contextMenu(tile(6));
+    fireEvent.click(menuItem('Deselect'));
+    expect(checkedIds(10)).toEqual([]);
+  });
+
+  it('Download downloads the right-clicked photo', async () => {
+    renderGrid();
+    fireEvent.contextMenu(tile(3));
+    fireEvent.click(menuItem('Download'));
+
+    await waitFor(() =>
+      expect(photosService.downloadPhoto).toHaveBeenCalledWith(1, 3, 'photo-3.jpg')
+    );
+  });
+
+  it('Delete on a selected photo deletes the whole selection after confirming', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderGrid();
+    fireEvent.click(checkbox(1));
+    fireEvent.click(checkbox(3), { shiftKey: true });
+
+    fireEvent.contextMenu(tile(2));
+    expect(menuItem('Delete {{count}} photos')).toBeInTheDocument();
+    fireEvent.click(menuItem('Delete {{count}} photos'));
+
+    await waitFor(() => expect(photosService.deletePhotos).toHaveBeenCalledTimes(1));
+    const [, ids] = vi.mocked(photosService.deletePhotos).mock.calls[0];
+    expect([...ids].sort((a, b) => a - b)).toEqual([1, 2, 3]);
+    expect(confirmSpy).toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('Delete on an unselected photo deletes only that photo', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderGrid();
+    fireEvent.contextMenu(tile(9));
+    fireEvent.click(menuItem('Delete'));
+
+    await waitFor(() => expect(photosService.deletePhoto).toHaveBeenCalledWith(1, 9));
+    expect(photosService.deletePhotos).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('closes on Escape and on an outside click without doing anything', () => {
+    renderGrid();
+    fireEvent.contextMenu(tile(3));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(menu()).not.toBeInTheDocument();
+
+    fireEvent.contextMenu(tile(3));
+    fireEvent.mouseDown(document.body);
+    expect(menu()).not.toBeInTheDocument();
+    expect(photosService.updatePhotosCategory).not.toHaveBeenCalled();
+  });
+
+  it('stays inside the viewport near the bottom-right corner', () => {
+    renderGrid();
+    fireEvent.contextMenu(tile(3), { clientX: window.innerWidth - 2, clientY: window.innerHeight - 2 });
+    const el = menu() as HTMLElement;
+
+    expect(parseFloat(el.style.left)).toBeLessThanOrEqual(window.innerWidth);
+    expect(parseFloat(el.style.top)).toBeLessThanOrEqual(window.innerHeight);
+  });
 });
