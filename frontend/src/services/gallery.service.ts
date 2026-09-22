@@ -132,22 +132,38 @@ export const galleryService = {
 
   // Download selected photos as ZIP
   async downloadSelectedPhotos(slug: string, photoIds: number[]): Promise<void> {
-    const response = await api.post(`/gallery/${slug}/download-selected`, { photo_ids: photoIds }, {
-      responseType: 'blob',
-    });
+    // Same reasoning as downloadAllPhotos: let the browser download it, so the
+    // ZIP streams straight into the Downloads folder with a live progress bar
+    // (the server sends its exact size) instead of being held in page memory
+    // until the last byte arrives. The ids travel in a POST body, so this is a
+    // plain form rather than a link; the gallery cookie authenticates it just
+    // like the download-all link. It posts into a hidden frame so an error
+    // response can never replace the gallery page.
+    const frameName = 'gallery-download-frame';
+    let frame = document.querySelector<HTMLIFrameElement>(`iframe[name="${frameName}"]`);
+    if (!frame) {
+      frame = document.createElement('iframe');
+      frame.name = frameName;
+      frame.style.display = 'none';
+      frame.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(frame);
+    }
 
-    // Typed explicitly: an untyped Blob is what made Android append .txt to
-    // the filename. This path still buffers, because the selected ids travel
-    // in a POST body and so cannot be a plain link, but a selection is a
-    // handful of photos rather than the whole gallery.
-    const url = window.URL.createObjectURL(asTypedBlob(response, 'application/zip'));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${slug}-selected.zip`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = buildResourceUrl(`/api/gallery/${encodeURIComponent(slug)}/download-selected`);
+    form.target = frameName;
+    form.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'photo_ids';
+    input.value = photoIds.join(',');
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
   },
 
   // Get gallery statistics

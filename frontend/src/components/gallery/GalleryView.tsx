@@ -470,7 +470,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
       return;
     }
     
-    const selectedPhotosList = filteredPhotos.filter(p => selectedPhotos.has(p.id));
+    const selectedIds = filteredPhotos.filter(p => selectedPhotos.has(p.id)).map(p => p.id);
     
     // Track bulk download
     analyticsService.trackGalleryEvent('bulk_download', {
@@ -478,10 +478,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
       photo_count: selectedPhotos.size
     });
     
-    // Download each selected photo
-    for (const photo of selectedPhotosList) {
-      await galleryService.downloadPhoto(slug, photo.id, photo.filename);
-    }
+    // One ZIP with all selected photos, streamed by the browser like any download
+    await galleryService.downloadSelectedPhotos(slug, selectedIds);
     
     // Clear selection after download
     setSelectedPhotos(new Set());

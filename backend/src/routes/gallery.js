@@ -10,6 +10,7 @@ const { verifyGalleryAccess } = require('../middleware/gallery');
 const secureImageService = require('../services/secureImageService');
 const logger = require('../utils/logger');
 const { resolvePhotoFilePath } = require('../services/photoResolver');
+const { predictZipSize, withFileSizes } = require('../services/zipSize');
 const { getEventShareToken, resolveShareIdentifier, buildShareLinkVariants } = require('../services/shareLinkService');
 const { handleAsync } = require('../utils/routeHelpers');
 const { NotFoundError } = require('../utils/errors');
@@ -556,16 +557,6 @@ router.get('/:slug/download-all', verifyGalleryAccess, async (req, res) => {
     const uniqueTypes = new Set(photos.map(p => p.type)).size;
     const hasMultipleTypes = uniqueTypes > 1;
     
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${req.event.slug}.zip"`);
-    
-    const archive = archiver('zip', { zlib: { level: 0 } });
-    archive.on('error', (err) => {
-      throw err;
-    });
-    
-    archive.pipe(res);
-    
     // Get watermark settings - apply if global setting OR event-level setting is enabled
     const watermarkSettings = await watermarkService.getWatermarkSettings();
     const eventWatermarkEnabled = req.event.watermark_downloads === true || req.event.watermark_downloads === 1;
@@ -576,7 +567,9 @@ router.get('/:slug/download-all', verifyGalleryAccess, async (req, res) => {
       text: req.event.watermark_text || watermarkSettings?.text || 'Protected'
     } : null;
 
-    // Add photos to archive
+    // Resolve every file and its name in the archive before anything is sent,
+    // so the exact ZIP size can go out as Content-Length
+    const entries = [];
     for (const photo of photos) {
       let filePath;
       try {
@@ -602,23 +595,45 @@ router.get('/:slug/download-all', verifyGalleryAccess, async (req, res) => {
         archiveName = photo.filename;
       }
 
-      if (shouldApplyWatermark && effectiveSettings) {
+      entries.push({ photo, filePath, name: archiveName });
+    }
+
+    const watermarking = Boolean(shouldApplyWatermark && effectiveSettings);
+    // Watermarked bytes are only known once rendered, so those downloads go without a size
+    const zipEntries = watermarking ? entries : await withFileSizes(entries);
+    const zipSize = watermarking ? null : predictZipSize(zipEntries);
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${req.event.slug}.zip"`);
+    if (zipSize !== null) {
+      res.setHeader('Content-Length', zipSize);
+    }
+
+    const archive = archiver('zip', { zlib: { level: 0 } });
+    archive.on('error', (err) => {
+      throw err;
+    });
+
+    archive.pipe(res);
+
+    for (const entry of zipEntries) {
+      if (watermarking) {
         try {
-          const watermarkedBuffer = await watermarkService.applyWatermark(filePath, effectiveSettings);
-          archive.append(watermarkedBuffer, { name: archiveName });
+          const watermarkedBuffer = await watermarkService.applyWatermark(entry.filePath, effectiveSettings);
+          archive.append(watermarkedBuffer, { name: entry.name });
         } catch (watermarkError) {
           logger.warn('Failed to watermark photo for bulk download, skipping original to avoid leak', {
             slug: req.params.slug,
-            photoId: photo.id,
+            photoId: entry.photo.id,
             eventId: req.event.id,
             error: watermarkError.message,
           });
         }
       } else {
-        archive.file(filePath, { name: archiveName });
+        archive.file(entry.filePath, { name: entry.name });
       }
     }
-    
+
     await archive.finalize();
     
     // Log bulk download
@@ -646,7 +661,12 @@ router.post('/:slug/download-selected', verifyGalleryAccess, async (req, res) =>
       return res.status(403).json({ error: 'Downloads are disabled for this gallery' });
     }
 
-    const ids = Array.isArray(req.body?.photo_ids) ? req.body.photo_ids : [];
+    // JSON array from the API client, or a comma-separated string from the
+    // plain form POST the gallery uses so the browser streams the ZIP itself
+    const rawIds = req.body?.photo_ids;
+    const ids = Array.isArray(rawIds)
+      ? rawIds
+      : (typeof rawIds === 'string' ? rawIds.split(',') : []);
     if (!ids.length) {
       return res.status(400).json({ error: 'photo_ids is required (non-empty array)' });
     }
@@ -655,7 +675,7 @@ router.post('/:slug/download-selected', verifyGalleryAccess, async (req, res) =>
     const photoIds = ids
       .map((v) => parseInt(v, 10))
       .filter((v) => Number.isInteger(v))
-      .slice(0, 500);
+      .slice(0, 5000);
 
     if (photoIds.length === 0) {
       return res.status(400).json({ error: 'No valid photo IDs provided' });
@@ -673,8 +693,41 @@ router.post('/:slug/download-selected', verifyGalleryAccess, async (req, res) =>
     }
 
     const archiveName = `${req.event.slug}-selected.zip`;
+
+    // Check watermark settings - apply if global setting OR event-level setting is enabled
+    const watermarkSettings = await watermarkService.getWatermarkSettings();
+    const eventWatermarkEnabled = req.event.watermark_downloads === true || req.event.watermark_downloads === 1;
+    const shouldApplyWatermark = (watermarkSettings && watermarkSettings.enabled) || eventWatermarkEnabled;
+    const effectiveSettings = shouldApplyWatermark ? {
+      ...watermarkSettings,
+      enabled: true,
+      text: req.event.watermark_text || watermarkSettings?.text || 'Protected'
+    } : null;
+
+    const entries = [];
+    for (const photo of photos) {
+      try {
+        const filePath = resolvePhotoFilePath(req.event, photo);
+        entries.push({ photo, filePath, name: photo.filename || `photo-${photo.id}.jpg` });
+      } catch (resolveError) {
+        logger.warn('Skipping selected photo due to unresolved path', {
+          slug: req.params.slug,
+          photoId: photo.id,
+          eventId: req.event.id,
+          error: resolveError.message,
+        });
+      }
+    }
+
+    const watermarking = Boolean(shouldApplyWatermark && effectiveSettings);
+    const zipEntries = watermarking ? entries : await withFileSizes(entries);
+    const zipSize = watermarking ? null : predictZipSize(zipEntries);
+
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${archiveName}"`);
+    if (zipSize !== null) {
+      res.setHeader('Content-Length', zipSize);
+    }
 
     const archive = archiver('zip', { zlib: { level: 0 } });
     archive.on('error', (err) => {
@@ -691,42 +744,21 @@ router.post('/:slug/download-selected', verifyGalleryAccess, async (req, res) =>
     });
     archive.pipe(res);
 
-    // Check watermark settings - apply if global setting OR event-level setting is enabled
-    const watermarkSettings = await watermarkService.getWatermarkSettings();
-    const eventWatermarkEnabled = req.event.watermark_downloads === true || req.event.watermark_downloads === 1;
-    const shouldApplyWatermark = (watermarkSettings && watermarkSettings.enabled) || eventWatermarkEnabled;
-    const effectiveSettings = shouldApplyWatermark ? {
-      ...watermarkSettings,
-      enabled: true,
-      text: req.event.watermark_text || watermarkSettings?.text || 'Protected'
-    } : null;
-
-    for (const photo of photos) {
-      try {
-        const filePath = resolvePhotoFilePath(req.event, photo);
-        const name = photo.filename || `photo-${photo.id}.jpg`;
-        if (shouldApplyWatermark && effectiveSettings) {
-          try {
-            const watermarkedBuffer = await watermarkService.applyWatermark(filePath, effectiveSettings);
-            archive.append(watermarkedBuffer, { name });
-          } catch (watermarkError) {
-            logger.warn('Failed to watermark selected photo, skipping original to avoid leak', {
-              slug: req.params.slug,
-              photoId: photo.id,
-              eventId: req.event.id,
-              error: watermarkError.message,
-            });
-          }
-        } else {
-          archive.file(filePath, { name });
+    for (const entry of zipEntries) {
+      if (watermarking) {
+        try {
+          const watermarkedBuffer = await watermarkService.applyWatermark(entry.filePath, effectiveSettings);
+          archive.append(watermarkedBuffer, { name: entry.name });
+        } catch (watermarkError) {
+          logger.warn('Failed to watermark selected photo, skipping original to avoid leak', {
+            slug: req.params.slug,
+            photoId: entry.photo.id,
+            eventId: req.event.id,
+            error: watermarkError.message,
+          });
         }
-      } catch (resolveError) {
-        logger.warn('Skipping selected photo due to unresolved path', {
-          slug: req.params.slug,
-          photoId: photo.id,
-          eventId: req.event.id,
-          error: resolveError.message,
-        });
+      } else {
+        archive.file(entry.filePath, { name: entry.name });
       }
     }
 

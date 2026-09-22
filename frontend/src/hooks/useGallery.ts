@@ -69,12 +69,10 @@ export const useDownloadAllPhotos = () => {
   return useMutation({
     mutationFn: (slug: string) => galleryService.downloadAllPhotos(slug),
     onMutate: () => {
-      // The browser now downloads this itself, so the only thing we know is
-      // that it has been handed over. The zip is built and streamed as it is
-      // requested, so a large gallery takes a while before the file appears in
-      // the download list — say so, rather than looking like nothing happened.
-      toast.info('Preparing your download — a large gallery can take a few minutes to start. It will appear in your downloads.', {
-        autoClose: 8000,
+      // The browser downloads the ZIP itself, streamed with its full size, so it
+      // shows up in the download list with a progress bar straight away.
+      toast.info('Your download has started — follow its progress in your browser\'s downloads.', {
+        autoClose: 6000,
       });
     },
     onError: () => {
