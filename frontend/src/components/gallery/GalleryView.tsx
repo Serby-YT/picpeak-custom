@@ -834,6 +834,18 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
           />
         </div>
 
+        {/* Same category bar after the last photo, to pick the next section */}
+        {showCategoryBar && (
+          <GalleryCategoryBar
+            position="bottom"
+            categories={categoriesWithPhotos}
+            selectedCategoryId={selectedCategoryId}
+            onCategoryChange={setSelectedCategoryId}
+            photoCounts={photoCounts}
+            totalPhotos={data?.photos.length || 0}
+          />
+        )}
+
         {/* Upload Modal */}
         {showUploadModal && (data?.event?.allow_user_uploads || event?.allow_user_uploads) && (
           <UserPhotoUpload

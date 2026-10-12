@@ -8,7 +8,13 @@ interface GalleryCategoryBarProps {
   onCategoryChange: (categoryId: number | string | null) => void;
   photoCounts: Record<number | string, number>;
   totalPhotos: number;
+  // 'bottom' is the copy after the last photo: picking a category there jumps
+  // back up to the top bar, so the client starts the new section from its
+  // first photo instead of landing somewhere in the middle of it.
+  position?: 'top' | 'bottom';
 }
+
+const TOP_BAR_ID = 'gallery-category-bar-top';
 
 /**
  * Category pills shown right under the hero. Clients missed the categories
@@ -24,6 +30,7 @@ export const GalleryCategoryBar: React.FC<GalleryCategoryBarProps> = ({
   onCategoryChange,
   photoCounts,
   totalPhotos,
+  position = 'top',
 }) => {
   const { t } = useTranslation();
   const navRef = useRef<HTMLElement>(null);
@@ -51,9 +58,18 @@ export const GalleryCategoryBar: React.FC<GalleryCategoryBarProps> = ({
     : undefined;
 
   const select = (id: number | string | null, el: HTMLButtonElement) => {
-    onCategoryChange(id);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const behavior: ScrollBehavior = reduceMotion ? 'auto' : 'smooth';
     // Keep the tapped pill fully visible when the row is scrolled sideways.
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    // Done before the page scroll below so it cannot cancel it.
+    el.scrollIntoView({ behavior, block: 'nearest', inline: 'nearest' });
+    onCategoryChange(id);
+    if (position === 'bottom') {
+      const top = document.getElementById(TOP_BAR_ID);
+      if (top) {
+        window.scrollTo({ top: top.getBoundingClientRect().top + window.scrollY - 16, behavior });
+      }
+    }
   };
 
   const pills: { id: number | string | null; name: string; count: number }[] = [
@@ -64,10 +80,11 @@ export const GalleryCategoryBar: React.FC<GalleryCategoryBarProps> = ({
   return (
     <nav
       ref={navRef}
+      id={position === 'top' ? TOP_BAR_ID : undefined}
       onScroll={updateFade}
       aria-label={t('gallery.categories')}
       style={{ maskImage, WebkitMaskImage: maskImage }}
-      className="gallery-category-bar -mx-2 px-2 mb-6 sm:mx-0 sm:px-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className={`gallery-category-bar ${position === 'bottom' ? 'mt-10 sm:mt-14' : 'mb-6'} -mx-2 px-2 sm:mx-0 sm:px-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
     >
       <div className="flex gap-2 w-max sm:w-auto sm:flex-wrap sm:justify-center">
         {pills.map(pill => {
