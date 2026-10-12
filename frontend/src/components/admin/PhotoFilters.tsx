@@ -63,7 +63,9 @@ export const PhotoFilters: React.FC<PhotoFiltersProps> = ({
             className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           >
             <option value="">{t('gallery.allCategories', 'All Categories')}</option>
-            <option value="0">{t('gallery.uncategorized', 'Uncategorized')}</option>
+            {/* The API filters on the literal "uncategorized"; it reads "0" as no
+                filter at all, so this option used to show every photo. */}
+            <option value="uncategorized">{t('gallery.uncategorized', 'Uncategorized')}</option>
             {categories.map(cat => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
