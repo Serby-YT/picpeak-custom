@@ -70,6 +70,8 @@ interface PhotoGridWithLayoutsProps {
   onLogout?: () => void;
   // Photographer/studio name credit shown bottom-center of the hero
   photographerName?: string;
+  // Rendered directly under the hero (or at the top when there is no hero)
+  belowHero?: React.ReactNode;
 }
 
 export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
@@ -104,7 +106,8 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
   heroDividerStyle = 'wave',
   heroImageAnchor = 'center',
   onLogout,
-  photographerName
+  photographerName,
+  belowHero
 }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -300,6 +303,8 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
           isDownloading={isDownloading}
         />
       )}
+
+      {!isFullPageLayout && belowHero}
 
       {/* Selection Mode Controls - Not shown for carousel, full-page layouts, or when controls are hidden */}
       {showSelectionControls && photos.length > 1 && galleryLayout !== 'carousel' && !isFullPageLayout && (

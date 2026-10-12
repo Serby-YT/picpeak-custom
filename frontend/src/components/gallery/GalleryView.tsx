@@ -11,6 +11,7 @@ import { ExpirationBanner } from './ExpirationBanner';
 import { CountdownTimer } from './CountdownTimer';
 import { GalleryLayout } from './GalleryLayout';
 import { GallerySidebar } from './GallerySidebar';
+import { GalleryCategoryBar } from './GalleryCategoryBar';
 import { PhotoFilterBar } from './PhotoFilterBar';
 import { UserPhotoUpload } from './UserPhotoUpload';
 import type { FilterType } from './GalleryFilter';
@@ -582,6 +583,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
     ? controlsStyle === 'sidebar'
     : (theme.galleryLayout !== 'grid' || isHeroHeader);
 
+  // Category pills under the hero. The sidebar keeps its list too; both drive
+  // selectedCategoryId. Without the sidebar, PhotoFilterBar already shows the
+  // categories inline; carousel has no category filtering. Neither gets the bar.
+  const categoriesWithPhotos = (data?.categories || []).filter(cat => photoCounts[cat.id] > 0);
+  const showCategoryBar = showSidebar && theme.galleryLayout !== 'carousel' && categoriesWithPhotos.length >= 2;
+
   // Full-page layouts (gallery-premium, gallery-story) have their own integrated UI
   // Skip all wrapper elements (header, footer, sidebar, filters) for these layouts
   const isFullPageLayout = theme.galleryLayout === 'gallery-premium' || theme.galleryLayout === 'gallery-story';
@@ -655,7 +662,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(!sidebarOpen)}
           slug={slug}
-          categories={(data?.categories || []).filter(cat => photoCounts[cat.id] > 0)}
+          categories={categoriesWithPhotos}
           selectedCategoryId={selectedCategoryId}
           onCategoryChange={setSelectedCategoryId}
           searchTerm={searchTerm}
@@ -815,6 +822,15 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
             headerStyle={data?.event?.header_style || theme.headerStyle}
             heroDividerStyle={data?.event?.hero_divider_style || theme.heroDividerStyle || 'wave'}
             heroImageAnchor={data?.event?.hero_image_anchor || 'center'}
+            belowHero={showCategoryBar ? (
+              <GalleryCategoryBar
+                categories={categoriesWithPhotos}
+                selectedCategoryId={selectedCategoryId}
+                onCategoryChange={setSelectedCategoryId}
+                photoCounts={photoCounts}
+                totalPhotos={data?.photos.length || 0}
+              />
+            ) : undefined}
           />
         </div>
 
