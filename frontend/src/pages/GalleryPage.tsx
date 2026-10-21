@@ -15,11 +15,11 @@ import { galleryService } from '../services';
 import { api } from '../config/api';
 import { GALLERY_THEME_PRESETS } from '../types/theme.types';
 import { buildResourceUrl } from '../utils/url';
-import { isGalleryPublic, normalizeRequirePassword } from '../utils/accessControl';
+import { normalizeRequirePassword } from '../utils/accessControl';
 
 export const GalleryPage: React.FC = () => {
   const { slug: rawSlug, token: rawToken } = useParams<{ slug: string; token?: string }>();
-  const { isAuthenticated, login, event } = useGalleryAuth();
+  const { isAuthenticated, login, event, isLoading: isSigningIn } = useGalleryAuth();
   const { t, i18n } = useTranslation();
   const { format } = useLocalizedDate();
   const { setTheme } = useTheme();
@@ -27,7 +27,6 @@ export const GalleryPage: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const [resolvedSlug, setResolvedSlug] = useState<string | null>(() => {
     if (rawSlug && !rawToken && /^[0-9a-fA-F]{32}$/.test(rawSlug)) {
       return null;
@@ -101,9 +100,6 @@ export const GalleryPage: React.FC = () => {
   const isLoadingInfo = isLoadingInfoQuery || isResolvingIdentifier;
   const requiresPassword = normalizeRequirePassword(galleryInfo?.requires_password, true);
 
-  React.useEffect(() => {
-    setAutoLoginAttempted(false);
-  }, [resolvedSlug]);
   
   // Fetch branding settings
   const { data: settingsData } = useQuery({
@@ -163,29 +159,9 @@ export const GalleryPage: React.FC = () => {
     }
   }, [galleryInfo, settingsData, setTheme]);
 
-  React.useEffect(() => {
-    if (!resolvedSlug || isResolvingIdentifier) {
-      return;
-    }
-
-    if (galleryInfo && isGalleryPublic(galleryInfo.requires_password) && !isAuthenticated && !autoLoginAttempted) {
-      setAutoLoginAttempted(true);
-      setIsLoggingIn(true);
-      login(resolvedSlug, '')
-        .then(() => {
-          setLoginError(null);
-        })
-        .catch((error: any) => {
-          const message = error?.response?.data?.error;
-          if (message) {
-            setLoginError(message);
-          }
-        })
-        .finally(() => {
-          setIsLoggingIn(false);
-        });
-    }
-  }, [galleryInfo, isAuthenticated, autoLoginAttempted, login, resolvedSlug, isResolvingIdentifier]);
+  // No auto-login for galleries without a password: they open only through the
+  // share link, which GalleryAuthContext signs in with (share-login). Signing in
+  // on the slug alone let anyone who guessed it into the gallery.
 
   // Calculate days until expiration (null if no expiration set)
   const daysUntilExpiration = galleryInfo?.expires_at
@@ -516,20 +492,23 @@ export const GalleryPage: React.FC = () => {
                   </p>
                 </>
               ) : (
-                <div className="text-center space-y-3">
-                  <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-theme">
-                    {t('gallery.publicGalleryTitle', 'This gallery is publicly accessible')}
-                  </h2>
-                  <p className="text-sm text-muted-theme">
-                    {t('gallery.publicGallerySubtitle', 'Loading the photos now...')}
-                  </p>
+                // No password: the share link signs the visitor in. Still not
+                // signed in once that has run means the page was opened without
+                // the link (by the gallery's name), which no longer gets in.
+                isSigningIn ? (
                   <div className="flex justify-center py-4">
                     <Loading size="sm" text={t('gallery.loading')} />
                   </div>
-                  {loginError && (
-                    <p className="text-xs text-red-600">{loginError}</p>
-                  )}
-                </div>
+                ) : (
+                  <div className="text-center space-y-3">
+                    <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-theme">
+                      {t('gallery.useShareLinkTitle', 'Open this gallery from your link')}
+                    </h2>
+                    <p className="text-sm text-muted-theme">
+                      {t('gallery.useShareLinkHint', 'Please use the link your photographer sent you to view these photos.')}
+                    </p>
+                  </div>
+                )
               )}
             </CardContent>
           </Card>

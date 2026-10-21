@@ -191,12 +191,20 @@ export const GalleryAuthProvider: React.FC<GalleryAuthProviderProps> = ({ childr
     const initialise = async () => {
       try {
         setIsLoading(true);
-        const sessionResponse = await api.get<{ valid: boolean; type: string; eventSlug?: string }>(
-          '/auth/session',
-          { params: { slug: currentSlug } }
-        );
+        // A first visit has no session yet and /auth/session answers 401. That is
+        // not an error: carry on and sign in with the share link below. (Galleries
+        // without a password used to be rescued by a slug-only login instead.)
+        let sessionResponse: { data?: { valid: boolean; type: string; eventSlug?: string } } | null = null;
+        try {
+          sessionResponse = await api.get<{ valid: boolean; type: string; eventSlug?: string }>(
+            '/auth/session',
+            { params: { slug: currentSlug } }
+          );
+        } catch {
+          sessionResponse = null;
+        }
 
-        if (sessionResponse.data?.valid && sessionResponse.data.type === 'gallery' && sessionResponse.data.eventSlug === currentSlug) {
+        if (sessionResponse?.data?.valid && sessionResponse.data.type === 'gallery' && sessionResponse.data.eventSlug === currentSlug) {
           setIsAuthenticated(true);
 
           if (!storedEvent) {

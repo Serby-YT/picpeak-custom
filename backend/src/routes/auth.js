@@ -247,14 +247,10 @@ router.post('/gallery/verify', [
         action: 'login_success'
       });
     } else {
-      logger.info('Public gallery access granted without password', { slug, ipAddress });
-      await trackSuccessfulLogin(`gallery:${slug}`, ipAddress, userAgent);
-      await db('access_logs').insert({
-        event_id: event.id,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        action: 'login_success'
-      });
+      // A gallery without a password opens only through its share link
+      // (share-login checks the link's secret). Handing out a token here for the
+      // slug alone let anyone who guessed photo-<name>-<date> into the gallery.
+      return res.status(401).json({ error: 'Open this gallery from the link you were sent' });
     }
 
     const token = jwt.sign({ 

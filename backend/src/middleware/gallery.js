@@ -11,39 +11,11 @@ async function verifyGalleryAccess(req, res, next) {
     const token = getGalleryTokenFromRequest(req, requestedSlug);
     let event;
 
+    // Every gallery, public ones included, is opened only through its share link:
+    // share-login checks the link's secret and hands out this token. Letting a
+    // password-free gallery through on its slug alone meant anyone who guessed
+    // photo-<name>-<date> could list and download every original.
     if (!token) {
-      if (!requestedSlug) {
-        return res.status(401).json({ error: 'No token provided' });
-      }
-
-      event = await withRetry(async () => {
-        return await db('events')
-          .where({ 
-            slug: requestedSlug,
-            is_active: formatBoolean(true),
-            is_archived: formatBoolean(false)
-          })
-          .select('*')
-          .first();
-      });
-
-      if (!event) {
-        return res.status(404).json({ error: 'Gallery not found or expired' });
-      }
-
-      const requiresPassword = !(event.require_password === false || event.require_password === 0 || event.require_password === '0');
-      if (!requiresPassword) {
-        req.event = event;
-        req.sessionID = `gallery_public_${event.id}_${Date.now()}`;
-        req.clientInfo = {
-          ip: req.ip || req.connection.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          fingerprint: `${req.ip}-${req.get('User-Agent')}`.substring(0, 32),
-          timestamp: Date.now()
-        };
-        return next();
-      }
-
       return res.status(401).json({ error: 'No token provided' });
     }
     
