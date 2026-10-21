@@ -3,6 +3,13 @@ import type { GalleryInfo, GalleryData, GalleryStats, ResolvedGalleryIdentifier 
 import { normalizeRequirePassword } from '../utils/accessControl';
 import { buildResourceUrl } from '../utils/url';
 
+// One ~1GB slice of a whole-gallery download (see DownloadPartsModal)
+export interface DownloadPart {
+  index: number;
+  photoCount: number;
+  size: number;
+}
+
 /**
  * Keep the MIME type that came back with the response.
  *
@@ -125,6 +132,23 @@ export const galleryService = {
     // the name removes the guess. The server still sends the same filename in
     // Content-Disposition, so nothing disagrees.
     link.setAttribute('download', `${slug}.zip`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+
+  // The whole gallery as ~1GB parts, or [] when it cannot be split
+  async getDownloadParts(slug: string): Promise<DownloadPart[]> {
+    const response = await api.get<{ parts: DownloadPart[] }>(`/gallery/${encodeURIComponent(slug)}/download-parts`);
+    return response.data.parts || [];
+  },
+
+  // One part, handed to the browser the same way as downloadAllPhotos. The
+  // server answers Range requests for it, so the browser can resume it.
+  downloadPart(slug: string, index: number, total: number): void {
+    const link = document.createElement('a');
+    link.href = buildResourceUrl(`/api/gallery/${encodeURIComponent(slug)}/download-all/part/${index}`);
+    link.setAttribute('download', `${slug}-part-${index}-of-${total}.zip`);
     document.body.appendChild(link);
     link.click();
     link.remove();

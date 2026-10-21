@@ -20,7 +20,8 @@ import { useDevToolsProtection } from '../../hooks/useDevToolsProtection';
 import { GALLERY_THEME_PRESETS } from '../../types/theme.types';
 import { api } from '../../config/api';
 import { Upload, Menu } from 'lucide-react';
-import { galleryService } from '../../services/gallery.service';
+import { galleryService, type DownloadPart } from '../../services/gallery.service';
+import { DownloadPartsModal } from './DownloadPartsModal';
 import { useWatermarkSettings } from '../../hooks/useWatermarkSettings';
 import { useGalleryCustomCss } from '../../hooks/useGalleryCustomCss';
 import type { Photo } from '../../types';
@@ -52,6 +53,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'size' | 'rating' | 'capture_date'>('capture_date');
   const [brandingSettings, setBrandingSettings] = useState<any>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [downloadParts, setDownloadParts] = useState<DownloadPart[] | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<number>>(new Set());
@@ -447,13 +449,29 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
   // Check if downloads are allowed (both event setting and not expired)
   const allowDownloads = !isExpired && (data?.event?.allow_downloads === true);
 
-  const handleDownloadAll = () => {
+  const handleDownloadAll = async () => {
     // Prevent downloads if gallery is expired or downloads disabled
     if (!allowDownloads) {
       return;
     }
-    
-    downloadAllMutation.mutate(slug);
+
+    // A phone gets a big gallery as ~1GB resumable parts: one long download is
+    // easily cut off by a locked screen or a network switch, and a single ZIP that
+    // breaks has to start over from zero
+    let parts: DownloadPart[] = [];
+    if (window.matchMedia?.('(hover: none) and (pointer: coarse)').matches) {
+      try {
+        parts = await galleryService.getDownloadParts(slug);
+      } catch {
+        // Fall back to the single archive
+      }
+    }
+
+    if (parts.length > 1) {
+      setDownloadParts(parts);
+    } else {
+      downloadAllMutation.mutate(slug);
+    }
     
     // Track download all action
     analyticsService.trackGalleryEvent('bulk_download', {
@@ -637,6 +655,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
           onLogout={logout}
           photographerName={brandingSettings?.company_name}
         />
+
+        {/* Whole gallery in parts, on phones */}
+        <DownloadPartsModal slug={slug} parts={downloadParts} onClose={() => setDownloadParts(null)} />
 
         {/* Upload Modal for full-page layouts */}
         {showUploadModal && (data?.event?.allow_user_uploads || event?.allow_user_uploads) && (
@@ -845,6 +866,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
             totalPhotos={data?.photos.length || 0}
           />
         )}
+
+        {/* Whole gallery in parts, on phones */}
+        <DownloadPartsModal slug={slug} parts={downloadParts} onClose={() => setDownloadParts(null)} />
 
         {/* Upload Modal */}
         {showUploadModal && (data?.event?.allow_user_uploads || event?.allow_user_uploads) && (

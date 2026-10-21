@@ -11,6 +11,7 @@ const secureImageService = require('../services/secureImageService');
 const logger = require('../utils/logger');
 const { resolvePhotoFilePath } = require('../services/photoResolver');
 const { predictZipSize, withFileSizes } = require('../services/zipSize');
+const { buildLayout, splitIntoParts, withFileStats, sendResumableZip } = require('../services/resumableZip');
 const { getEventShareToken, resolveShareIdentifier, buildShareLinkVariants } = require('../services/shareLinkService');
 const { handleAsync } = require('../utils/routeHelpers');
 const { NotFoundError } = require('../utils/errors');
@@ -534,6 +535,81 @@ router.get('/:slug/download/:photoId', verifyGalleryAccess, async (req, res) => 
   }
 });
 
+// Every photo of a gallery as archive entries, in the order all bulk downloads use.
+// entries is null when the gallery has no photos.
+async function collectBulkEntries(event, slug) {
+  // Fetch photos
+  const photos = await db('photos')
+    .where('photos.event_id', event.id)
+    .select('photos.*')
+    .orderBy('photos.type', 'asc')
+    .orderBy('photos.uploaded_at', 'desc');
+  
+  if (photos.length === 0) {
+    return { entries: null };
+  }
+  
+  // Count unique types
+  const uniqueTypes = new Set(photos.map(p => p.type)).size;
+  const hasMultipleTypes = uniqueTypes > 1;
+  
+  // Get watermark settings - apply if global setting OR event-level setting is enabled
+  const watermarkSettings = await watermarkService.getWatermarkSettings();
+  const eventWatermarkEnabled = event.watermark_downloads === true || event.watermark_downloads === 1;
+  const shouldApplyWatermark = (watermarkSettings && watermarkSettings.enabled) || eventWatermarkEnabled;
+  const effectiveSettings = shouldApplyWatermark ? {
+    ...watermarkSettings,
+    enabled: true,
+    text: event.watermark_text || watermarkSettings?.text || 'Protected'
+  } : null;
+
+  // Resolve every file and its name in the archive before anything is sent,
+  // so the exact ZIP size can go out as Content-Length
+  const entries = [];
+  for (const photo of photos) {
+    let filePath;
+    try {
+      filePath = resolvePhotoFilePath(event, photo);
+    } catch (resolveError) {
+      logger.warn('Skipping photo in bulk download due to unresolved path', {
+        slug: slug,
+        photoId: photo.id,
+        eventId: event.id,
+        error: resolveError.message,
+      });
+      continue;
+    }
+
+    // Determine the file name in the archive
+    let archiveName;
+    if (hasMultipleTypes) {
+      // Use photo type as folder
+      const folderName = photo.type === 'individual' ? 'Individual Photos' : 'Collages';
+      archiveName = path.join(folderName, photo.filename);
+    } else {
+      // No folders, just the filename
+      archiveName = photo.filename;
+    }
+
+    entries.push({ photo, filePath, name: archiveName });
+  }
+
+  return { entries, watermarking: Boolean(shouldApplyWatermark && effectiveSettings), effectiveSettings };
+}
+
+// Phones fetch a whole gallery as ~1GB parts, each resumable on its own. null when
+// the gallery cannot be split that way (watermarked bytes are only known once
+// rendered, or a single file is too big), and the phone falls back to download-all.
+async function loadDownloadParts(event, slug) {
+  const { entries, watermarking } = await collectBulkEntries(event, slug);
+  if (!entries || watermarking) return null;
+  const parts = splitIntoParts(await withFileStats(entries));
+  if (!parts || parts.length === 0) return null;
+  const layouts = parts.map(buildLayout);
+  if (layouts.some((layout) => !layout)) return null;
+  return parts.map((partEntries, i) => ({ entries: partEntries, layout: layouts[i] }));
+}
+
 // Download all photos as ZIP
 router.get('/:slug/download-all', verifyGalleryAccess, async (req, res) => {
   try {
@@ -542,60 +618,9 @@ router.get('/:slug/download-all', verifyGalleryAccess, async (req, res) => {
       return res.status(403).json({ error: 'Downloads are disabled for this gallery' });
     }
     
-    // Fetch photos
-    const photos = await db('photos')
-      .where('photos.event_id', req.event.id)
-      .select('photos.*')
-      .orderBy('photos.type', 'asc')
-      .orderBy('photos.uploaded_at', 'desc');
-    
-    if (photos.length === 0) {
+    const { entries, watermarking: shouldApplyWatermark, effectiveSettings } = await collectBulkEntries(req.event, req.params.slug);
+    if (entries === null) {
       return res.status(404).json({ error: 'No photos found' });
-    }
-    
-    // Count unique types
-    const uniqueTypes = new Set(photos.map(p => p.type)).size;
-    const hasMultipleTypes = uniqueTypes > 1;
-    
-    // Get watermark settings - apply if global setting OR event-level setting is enabled
-    const watermarkSettings = await watermarkService.getWatermarkSettings();
-    const eventWatermarkEnabled = req.event.watermark_downloads === true || req.event.watermark_downloads === 1;
-    const shouldApplyWatermark = (watermarkSettings && watermarkSettings.enabled) || eventWatermarkEnabled;
-    const effectiveSettings = shouldApplyWatermark ? {
-      ...watermarkSettings,
-      enabled: true,
-      text: req.event.watermark_text || watermarkSettings?.text || 'Protected'
-    } : null;
-
-    // Resolve every file and its name in the archive before anything is sent,
-    // so the exact ZIP size can go out as Content-Length
-    const entries = [];
-    for (const photo of photos) {
-      let filePath;
-      try {
-        filePath = resolvePhotoFilePath(req.event, photo);
-      } catch (resolveError) {
-        logger.warn('Skipping photo in bulk download due to unresolved path', {
-          slug: req.params.slug,
-          photoId: photo.id,
-          eventId: req.event.id,
-          error: resolveError.message,
-        });
-        continue;
-      }
-
-      // Determine the file name in the archive
-      let archiveName;
-      if (hasMultipleTypes) {
-        // Use photo type as folder
-        const folderName = photo.type === 'individual' ? 'Individual Photos' : 'Collages';
-        archiveName = path.join(folderName, photo.filename);
-      } else {
-        // No folders, just the filename
-        archiveName = photo.filename;
-      }
-
-      entries.push({ photo, filePath, name: archiveName });
     }
 
     const watermarking = Boolean(shouldApplyWatermark && effectiveSettings);
@@ -650,6 +675,68 @@ router.get('/:slug/download-all', verifyGalleryAccess, async (req, res) => {
       error: error.message,
     });
     res.status(500).json({ error: 'Failed to create download archive' });
+  }
+});
+
+// How a phone should fetch the whole gallery: the list of ~1GB parts
+router.get('/:slug/download-parts', verifyGalleryAccess, async (req, res) => {
+  try {
+    if (req.event.allow_downloads === false) {
+      return res.status(403).json({ error: 'Downloads are disabled for this gallery' });
+    }
+    const parts = await loadDownloadParts(req.event, req.params.slug);
+    res.json({
+      parts: (parts || []).map((part, i) => ({
+        index: i + 1,
+        photoCount: part.entries.length,
+        size: part.layout.size
+      }))
+    });
+  } catch (error) {
+    logger.error('Error listing gallery download parts', {
+      slug: req.params.slug,
+      eventId: req.event?.id,
+      error: error.message,
+    });
+    res.status(500).json({ error: 'Failed to list download parts' });
+  }
+});
+
+// One part of the whole gallery, answering Range requests so a dropped download resumes
+router.get('/:slug/download-all/part/:part', verifyGalleryAccess, async (req, res) => {
+  try {
+    if (req.event.allow_downloads === false) {
+      return res.status(403).json({ error: 'Downloads are disabled for this gallery' });
+    }
+    const index = Number.parseInt(req.params.part, 10);
+    const parts = await loadDownloadParts(req.event, req.params.slug);
+    if (!parts || !Number.isInteger(index) || index < 1 || index > parts.length) {
+      return res.status(404).json({ error: 'Download part not found' });
+    }
+
+    const filename = `${req.event.slug}-part-${index}-of-${parts.length}.zip`;
+    const { complete } = await sendResumableZip(req, res, parts[index - 1].layout, filename);
+
+    if (complete) {
+      await db('access_logs').insert({
+        event_id: req.event.id,
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        action: 'download_part'
+      });
+    }
+  } catch (error) {
+    logger.error('Error sending gallery download part', {
+      slug: req.params.slug,
+      eventId: req.event?.id,
+      part: req.params.part,
+      error: error.message,
+    });
+    if (res.headersSent) {
+      res.destroy();
+    } else {
+      res.status(500).json({ error: 'Failed to create download archive' });
+    }
   }
 });
 
