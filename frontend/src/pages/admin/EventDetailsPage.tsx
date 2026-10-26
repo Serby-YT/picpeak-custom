@@ -147,6 +147,7 @@ export const EventDetailsPage: React.FC = () => {
   }, [id, navigate]);
   
   type EditFormState = {
+    event_name: string;
     welcome_message: string;
     color_theme: string;
     css_template_id: number | null;
@@ -177,6 +178,7 @@ export const EventDetailsPage: React.FC = () => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState>({
+    event_name: '',
     welcome_message: '',
     color_theme: '',
     css_template_id: null,
@@ -393,6 +395,7 @@ export const EventDetailsPage: React.FC = () => {
 
   const handleStartEdit = () => {
     setEditForm({
+      event_name: event.event_name || '',
       welcome_message: event.welcome_message || '',
       color_theme: event.color_theme || '',
       css_template_id: event.css_template_id || null,
@@ -528,6 +531,13 @@ export const EventDetailsPage: React.FC = () => {
       return;
     }
 
+    // Renaming only changes the display name; the slug / share link stay the same
+    const eventNameToSave = editForm.event_name.trim();
+    if (!eventNameToSave) {
+      toast.error(t('validation.eventNameRequired', 'Event name is required.'));
+      return;
+    }
+
     if (requireExpiration && !editForm.expires_at) {
       toast.error(t('validation.expirationRequired', 'Expiration date is required.'));
       return;
@@ -535,6 +545,7 @@ export const EventDetailsPage: React.FC = () => {
 
     // Clean up the data - remove undefined values
     const updateData: any = {
+      event_name: eventNameToSave,
       expires_at: editForm.expires_at || null,
       allow_user_uploads: editForm.allow_user_uploads,
       require_password: editForm.require_password,
@@ -851,6 +862,20 @@ export const EventDetailsPage: React.FC = () => {
             
             {isEditing ? (
               <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                    {t('events.eventName')}
+                  </label>
+                  <Input
+                    type="text"
+                    value={editForm.event_name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, event_name: e.target.value }))}
+                    placeholder={t('events.eventNamePlaceholder')}
+                    maxLength={255}
+                    required
+                  />
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                     {t('events.welcomeMessageLabel')}
