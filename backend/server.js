@@ -612,9 +612,23 @@ function resolveThemeBackground(colorTheme) {
   return { background, dark: DARK_THEMES.has(themeName) };
 }
 
-app.get('/gallery/:slug', async (req, res, next) => {
+// Short share links (/g/remus-k7q2xa, since 2026-10-28) carry only the share
+// token, never a slug. The app moves the address to /gallery/ when it starts
+// (frontend main.tsx); chat-app crawlers never run it and keep the short link.
+app.get('/g/:token', (req, res, next) => sendGalleryPreview(req, res, next, {
+  slug: req.params.token,
+  pagePath: `/g/${req.params.token}`,
+  tokenOnly: true
+}));
+
+app.get('/gallery/:slug', (req, res, next) => sendGalleryPreview(req, res, next, {
+  slug: req.params.slug,
+  pagePath: `/gallery/${req.params.slug}`,
+  tokenOnly: false
+}));
+
+async function sendGalleryPreview(req, res, next, { slug, pagePath, tokenOnly }) {
   try {
-    const { slug } = req.params;
     // A gallery is reachable by two different strings: its slug, and the
     // share token that the links actually sent to clients are built from.
     // Looking up by slug alone missed every shared link — precisely the case
@@ -622,7 +636,9 @@ app.get('/gallery/:slug', async (req, res, next) => {
     // and chat apps showed 'PicPeak - Photo Sharing Platform'.
     const event = await db('events')
       .where({ is_active: true, is_archived: false })
-      .andWhere((builder) => builder.where({ slug }).orWhere({ share_token: slug }))
+      .andWhere((builder) => (tokenOnly
+        ? builder.where({ share_token: slug })
+        : builder.where({ slug }).orWhere({ share_token: slug })))
       .select('event_name', 'color_theme')
       .first();
 
@@ -631,7 +647,7 @@ app.get('/gallery/:slug', async (req, res, next) => {
     }
 
     const baseUrl = (process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-    const pageUrl = `${baseUrl}/gallery/${slug}`;
+    const pageUrl = `${baseUrl}${pagePath}`;
     const imageUrl = `${baseUrl}/api/gallery/${slug}/preview-image`;
     // Romanian: every client these links go to is Romanian, and the preview is
     // the first thing they see. Hardcoded rather than driven by events.language
@@ -675,10 +691,10 @@ app.get('/gallery/:slug', async (req, res, next) => {
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.status(200).send(injected);
   } catch (error) {
-    logger.error('Failed to inject gallery meta tags', { error: error.message, slug: req.params.slug });
+    logger.error('Failed to inject gallery meta tags', { error: error.message, slug });
     return sendPlainSpaShell(res, next);
   }
-});
+}
 
 // Optional: Serve built frontend (native installs)
 try {

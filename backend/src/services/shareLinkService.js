@@ -1,6 +1,6 @@
 const { db } = require('../database/db');
 const { formatBoolean } = require('../utils/dbCompat');
-const { extractShareToken, isPotentialShareToken, buildSharePath } = require('../utils/shareLinkUtils');
+const { extractShareToken, isPotentialShareToken, buildSharePath, generateShareToken } = require('../utils/shareLinkUtils');
 
 const SETTING_KEY = 'general_short_gallery_urls';
 const CACHE_TTL_MS = 60_000;
@@ -180,7 +180,22 @@ const resolveShareIdentifier = async (identifier) => {
   return null;
 };
 
+// A fresh short share token no other gallery holds. A clash is vanishingly
+// rare, but share_token is unique in the database, so check rather than
+// let an event insert fail.
+const createUniqueShareToken = async (eventName) => {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const token = generateShareToken(eventName);
+    const taken = await db('events').where({ share_token: token }).first('id');
+    if (!taken) {
+      return token;
+    }
+  }
+  throw new Error('Could not generate a unique share token');
+};
+
 module.exports = {
+  createUniqueShareToken,
   isShortGalleryUrlsEnabled,
   clearShareLinkSettingsCache,
   buildShareLinkVariants,

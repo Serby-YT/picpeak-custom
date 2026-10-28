@@ -43,6 +43,13 @@ router.get('/resolve/:identifier', handleAsync(async (req, res) => {
   const { identifier } = req.params;
   let result = await resolveShareIdentifier(identifier);
 
+  // This answer contains the share token, the only secret a gallery has.
+  // Resolving the guessable slug ("photo-remus-2026-10-09") would hand it to
+  // anyone, so only identifiers that already contain the token resolve.
+  if (result && result.matchType === 'slug') {
+    throw new NotFoundError('Gallery');
+  }
+
   // If not found, check for redirect
   if (!result) {
     const newSlug = await checkSlugRedirect(identifier);

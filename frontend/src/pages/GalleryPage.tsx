@@ -16,6 +16,7 @@ import { api } from '../config/api';
 import { GALLERY_THEME_PRESETS } from '../types/theme.types';
 import { buildResourceUrl } from '../utils/url';
 import { normalizeRequirePassword } from '../utils/accessControl';
+import { looksLikeShareToken } from '../utils/shareToken';
 
 export const GalleryPage: React.FC = () => {
   const { slug: rawSlug, token: rawToken } = useParams<{ slug: string; token?: string }>();
@@ -28,14 +29,14 @@ export const GalleryPage: React.FC = () => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [resolvedSlug, setResolvedSlug] = useState<string | null>(() => {
-    if (rawSlug && !rawToken && /^[0-9a-fA-F]{32}$/.test(rawSlug)) {
+    if (rawSlug && !rawToken && looksLikeShareToken(rawSlug)) {
       return null;
     }
     return rawSlug || null;
   });
   const [resolvedToken, setResolvedToken] = useState<string | undefined>(rawToken);
   const [isResolvingIdentifier, setIsResolvingIdentifier] = useState<boolean>(() =>
-    Boolean(rawSlug && !rawToken && /^[0-9a-fA-F]{32}$/.test(rawSlug))
+    Boolean(rawSlug && !rawToken && looksLikeShareToken(rawSlug))
   );
   const [identifierError, setIdentifierError] = useState<string | null>(null);
   const lastResolvedIdentifier = React.useRef<string | null>(null);
@@ -43,7 +44,7 @@ export const GalleryPage: React.FC = () => {
   React.useEffect(() => {
     let cancelled = false;
 
-    const looksLikeToken = Boolean(rawSlug && !rawToken && /^[0-9a-fA-F]{32}$/.test(rawSlug));
+    const looksLikeToken = Boolean(rawSlug && !rawToken && looksLikeShareToken(rawSlug));
 
     if (!rawSlug) {
       lastResolvedIdentifier.current = null;

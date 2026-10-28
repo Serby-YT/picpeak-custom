@@ -5,6 +5,7 @@ import { api } from '../config/api';
 import { authService, galleryService } from '../services';
 import { cleanupOldGalleryAuth } from '../utils/cleanupGalleryAuth';
 import { normalizeRequirePassword } from '../utils/accessControl';
+import { looksLikeShareToken } from '../utils/shareToken';
 import {
   clearActiveGallerySlug,
   clearGalleryToken,
@@ -100,7 +101,7 @@ export const GalleryAuthProvider: React.FC<GalleryAuthProviderProps> = ({ childr
         return;
       }
 
-      const looksLikeToken = /^[0-9a-fA-F]{32}$/.test(identifier) && !tokenSegment;
+      const looksLikeToken = looksLikeShareToken(identifier) && !tokenSegment;
 
       if (looksLikeToken) {
         if (lastResolvedIdentifier.current === identifier) {

@@ -12,7 +12,7 @@ const fs = require('fs').promises;
 const { db } = require('../database/db');
 const { formatBoolean } = require('../utils/dbCompat');
 const { validatePasswordInContext, getBcryptRounds } = require('../utils/passwordValidation');
-const { buildShareLinkVariants, toFullShareUrl } = require('./shareLinkService');
+const { buildShareLinkVariants, toFullShareUrl, createUniqueShareToken } = require('./shareLinkService');
 const { parseBooleanInput, parseStringInput } = require('../utils/parsers');
 const eventTypeService = require('./eventTypeService');
 
@@ -165,7 +165,7 @@ const createEvent = async (eventData) => {
   const slug = await generateUniqueSlug(event_type, event_name, event_date);
 
   // Generate share link
-  const shareToken = crypto.randomBytes(16).toString('hex');
+  const shareToken = await createUniqueShareToken(event_name);
   const { shareUrl, shareLinkToStore } = await buildShareLinkVariants({ slug, shareToken });
 
   // Hash password

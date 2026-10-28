@@ -16,7 +16,7 @@ const { escapeLikePattern } = require('../utils/sqlSecurity');
 // formatDate import removed - dates are formatted by email processor
 const { validatePasswordInContext, getBcryptRounds } = require('../utils/passwordValidation');
 const logger = require('../utils/logger');
-const { buildShareLinkVariants, toFullShareUrl } = require('../services/shareLinkService');
+const { buildShareLinkVariants, toFullShareUrl, createUniqueShareToken } = require('../services/shareLinkService');
 const { parseBooleanInput, parseStringInput } = require('../utils/parsers');
 const eventTypeService = require('../services/eventTypeService');
 const { validateFileType } = require('../utils/fileSecurityUtils');
@@ -336,7 +336,7 @@ router.post('/', adminAuth, requirePermission('events.create'), [
     }
     
     // Generate share link respecting configured format
-    const shareToken = crypto.randomBytes(16).toString('hex');
+    const shareToken = await createUniqueShareToken(event_name);
     const { shareUrl, shareLinkToStore } = await buildShareLinkVariants({ slug, shareToken });
     
     // Hash password with configurable rounds (random placeholder when not required)

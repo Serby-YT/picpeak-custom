@@ -10,7 +10,7 @@ const { requireSuperAdmin } = require('../middleware/permissions');
 const fs = require('fs').promises;
 const path = require('path');
 const router = express.Router();
-const { buildShareLinkVariants, toFullShareUrl } = require('../services/shareLinkService');
+const { buildShareLinkVariants, toFullShareUrl, createUniqueShareToken } = require('../services/shareLinkService');
 const { parseBooleanInput, parseStringInput } = require('../utils/parsers');
 const eventTypeService = require('../services/eventTypeService');
 
@@ -138,7 +138,7 @@ router.post('/', adminAuth, requireSuperAdmin(), [
     }
     
     // Generate share link variants (auto-detects short URL preference)
-    const shareToken = crypto.randomBytes(16).toString('hex');
+    const shareToken = await createUniqueShareToken(event_name);
     const { sharePath, shareUrl, shareLinkToStore } = await buildShareLinkVariants({ slug, shareToken });
     
     // Hash password (or placeholder when not required)
