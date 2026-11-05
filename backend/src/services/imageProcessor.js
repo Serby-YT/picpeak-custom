@@ -927,7 +927,54 @@ async function ensureThumbnailAtWidth(photo, requestedWidth) {
   }
 }
 
+// The sizes phones and laptops actually ask for, built ahead of time so the
+// first person to open a new gallery does not wait while the server makes
+// each one on request (about 6s per tile on a cold gallery, measured
+// 2026-11-05). The other tiers stay on-demand: they are rarer and each one
+// is a file on disk for every photo.
+const PREBUILT_THUMBNAIL_WIDTHS = [400, 800];
+const PREBUILT_DISPLAY_SIZES = [1080, 1600];
+
+/**
+ * Build the common screen sizes for one photo. Each call is idempotent (the
+ * ensure* helpers return the cached file when it is already there), and a
+ * failure on one size is logged and does not stop the others — the gallery
+ * still builds anything missing on request.
+ *
+ * @param {object} photo - photos row (needs id and event_id)
+ * @returns {Promise<number>} how many sizes now exist
+ */
+async function prebuildScreenSizes(photo) {
+  let built = 0;
+
+  for (const width of PREBUILT_THUMBNAIL_WIDTHS) {
+    if (await ensureThumbnailAtWidth(photo, width)) built++;
+  }
+
+  let displayRelPath = null;
+  try {
+    const { resolvePhotoFilePath } = require('./photoResolver');
+    const { db } = require('../database/db');
+    const event = await db('events').where('id', photo.event_id).first();
+    const originalPath = resolvePhotoFilePath(event, photo);
+    const candidate = path.join(getDisplayPath(), displayFilename(originalPath));
+    const stats = await fs.stat(candidate);
+    if (stats.size > 0) displayRelPath = path.relative(getStoragePath(), candidate);
+  } catch (error) {
+    // No display copy yet; the viewer sizes will be built on request.
+  }
+
+  if (displayRelPath) {
+    for (const size of PREBUILT_DISPLAY_SIZES) {
+      if (await ensureDisplayAtSize(displayRelPath, size)) built++;
+    }
+  }
+
+  return built;
+}
+
 module.exports = {
+  prebuildScreenSizes,
   generateThumbnail,
   ensureThumbnailAtWidth,
   THUMBNAIL_WIDTHS,

@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const { db } = require('../database/db');
 const logger = require('../utils/logger');
-const { generateDerivatives } = require('./imageProcessor');
+const { generateDerivatives, prebuildScreenSizes } = require('./imageProcessor');
 const { processUploadedVideo, isVideoMimeType } = require('./videoProcessor');
 const watermarkGeneratorService = require('./watermarkGeneratorService');
 
@@ -73,6 +73,14 @@ async function run({ photoId, filePath, filename, mimeType }) {
     await watermarkGeneratorService.generateForPhoto(photoId);
   } catch (error) {
     logger.warn(`Watermark generation failed for photo ${photoId}: ${error.message}`);
+  }
+
+  // Last, so the main thumbnail and display copy are never held up by it.
+  try {
+    const photo = await db('photos').where({ id: photoId }).first();
+    if (photo) await prebuildScreenSizes(photo);
+  } catch (error) {
+    logger.warn(`Pre-building screen sizes failed for photo ${photoId}: ${error.message}`);
   }
 }
 
