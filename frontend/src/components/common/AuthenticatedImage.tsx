@@ -306,13 +306,19 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   if (plainImageSrc) {
     const { sizes: callerSizes, loading: callerLoading, ...imgProps } = props;
     const srcSet = buildThumbnailSrcSet(plainImageSrc);
+    // Attribute order matters. React writes attributes in the order they are
+    // listed, and the browser can start the download the moment src is set —
+    // before it has seen loading="lazy". With src first, opening an 842-photo
+    // gallery on a phone fetched 223 thumbnails (tiles 18,000px down
+    // included) while 16 were on screen. loading, sizes and srcSet must all
+    // exist before src does.
     return (
       <img
-        src={plainImageSrc}
-        srcSet={srcSet}
-        sizes={srcSet ? callerSizes || DEFAULT_TILE_SIZES : callerSizes}
         loading={callerLoading || 'lazy'}
         decoding="async"
+        sizes={srcSet ? callerSizes || DEFAULT_TILE_SIZES : callerSizes}
+        srcSet={srcSet}
+        src={plainImageSrc}
         alt={alt}
         onLoad={onLoad}
         {...imgProps}

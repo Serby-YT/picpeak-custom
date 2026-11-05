@@ -517,6 +517,62 @@ async function ensureHeroImage(photo) {
   return null;
 }
 
+// Smaller copies of the cover for smaller screens. The full hero is 3840px,
+// about 1.2MB, and a phone was downloading it to fill a 375px-wide box. Closed
+// set for the same reason as THUMBNAIL_WIDTHS: each width is a file on disk.
+const HERO_WIDTHS = [1280, 1920, 2560];
+
+/**
+ * The cover at one of HERO_WIDTHS, built on first request from the full hero
+ * and cached beside it in heroes/w<width>/. Returns null for a width outside
+ * the set (the caller then serves the full hero). Rebuilt whenever the full
+ * hero is newer than the cached copy, so a regenerated cover never goes stale.
+ */
+async function ensureHeroAtWidth(heroRelPath, requestedWidth) {
+  const width = parseInt(requestedWidth, 10);
+  if (!HERO_WIDTHS.includes(width) || !heroRelPath) return null;
+
+  const sourcePath = path.join(getStoragePath(), heroRelPath);
+  const tierDir = path.join(getHeroPath(), `w${width}`);
+  const tierPath = path.join(tierDir, path.basename(sourcePath));
+
+  let sourceStats;
+  try {
+    sourceStats = await fs.stat(sourcePath);
+  } catch (error) {
+    return null;
+  }
+
+  try {
+    const stats = await fs.stat(tierPath);
+    if (stats.size > 0 && stats.mtimeMs >= sourceStats.mtimeMs) {
+      return path.relative(getStoragePath(), tierPath);
+    }
+  } catch (err) {
+    // Not built yet.
+  }
+
+  await fs.mkdir(tierDir, { recursive: true });
+  const tempPath = `${tierPath}.${process.pid}.${Date.now()}.tmp`;
+
+  try {
+    await sharp(sourcePath, { failOnError: false })
+      .resize(width, null, { withoutEnlargement: true })
+      .jpeg({ quality: 82, progressive: true, mozjpeg: true })
+      .toFile(tempPath);
+
+    const stats = await fs.stat(tempPath);
+    if (stats.size === 0) throw new Error('Generated hero copy is empty');
+
+    await fs.rename(tempPath, tierPath);
+    return path.relative(getStoragePath(), tierPath);
+  } catch (error) {
+    logger.error(`Failed to build ${width}px hero from ${heroRelPath}: ${error.message}`);
+    await fs.unlink(tempPath).catch(() => {});
+    return null;
+  }
+}
+
 // Display image settings — a lightbox-viewing variant, capped at a sane
 // on-screen resolution and encoded as WebP for a smaller transfer than the
 // original camera file. Never used for downloads (those always serve the
@@ -826,6 +882,8 @@ module.exports = {
   generateHeroImage,
   isHeroValid,
   ensureHeroImage,
+  ensureHeroAtWidth,
+  HERO_WIDTHS,
   generateDisplayImage,
   ensureDisplayImage,
   extractCaptureDate

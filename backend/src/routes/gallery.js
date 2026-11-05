@@ -16,7 +16,7 @@ const { buildLayout, splitIntoParts, withFileStats, sendResumableZip } = require
 const { getEventShareToken, resolveShareIdentifier, buildShareLinkVariants } = require('../services/shareLinkService');
 const { handleAsync } = require('../utils/routeHelpers');
 const { NotFoundError } = require('../utils/errors');
-const { ensureThumbnail, ensureThumbnailAtWidth, ensureHeroImage, ensureDisplayImage } = require('../services/imageProcessor');
+const { ensureThumbnail, ensureThumbnailAtWidth, ensureHeroImage, ensureHeroAtWidth, ensureDisplayImage } = require('../services/imageProcessor');
 const { timingSafeEqualStr } = require('../utils/timingSafe');
 
 // Get storage path from environment or default
@@ -1298,7 +1298,10 @@ router.get('/:slug/hero/:photoId',
         return res.redirect(`/api/gallery/${req.params.slug}/photo/${photoId}`);
       }
 
-      const heroFullPath = path.join(getStoragePath(), heroPath);
+      // A screen-sized copy when the client asks for one of HERO_WIDTHS; the
+      // full 3840px cover otherwise, or if building the copy fails.
+      const sizedHeroPath = req.query.w ? await ensureHeroAtWidth(heroPath, req.query.w) : null;
+      const heroFullPath = path.join(getStoragePath(), sizedHeroPath || heroPath);
       const fs = require('fs');
 
       // Verify file exists before attempting to serve
@@ -1314,7 +1317,7 @@ router.get('/:slug/hero/:photoId',
 
       // Get file stats for ETag
       const stat = fs.statSync(heroFullPath);
-      const etag = `"hero-${photoId}-${stat.mtime.getTime()}"`;
+      const etag = `"hero-${photoId}-${sizedHeroPath ? `w${req.query.w}-` : ''}${stat.mtime.getTime()}"`;
 
       // Check if client has valid cached version
       if (req.headers['if-none-match'] === etag) {

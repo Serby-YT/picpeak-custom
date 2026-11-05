@@ -42,6 +42,39 @@ interface HeroHeaderProps {
   isDownloading?: boolean;
 }
 
+// Widths the hero endpoint will build on request; anything larger gets the
+// full 3840px cover. Kept in step with HERO_WIDTHS on the backend.
+const HERO_TIERS = [1280, 1920, 2560];
+
+// How many image pixels the cover actually needs on this screen. The hero box
+// is object-cover, so a landscape photo on a portrait phone is scaled to the
+// box HEIGHT and its sides cropped — width alone would undersize it. Device
+// pixel ratio is capped at 2: a phone at 3x cannot show the difference on a
+// photo sitting behind the title scrim, and it costs over twice the bytes.
+// Box sizes mirror the classes below: 68svh (min 380px) on phones, full
+// screen from the sm breakpoint.
+// The hero file is always a 16:9 centre crop (generateHeroImage, fit: cover),
+// whatever shape the original photo was.
+const HERO_ASPECT = 16 / 9;
+
+const pickHeroWidth = (): number | null => {
+  if (typeof window === 'undefined') return null;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const boxHeight = vw < 640 ? Math.max(380, vh * 0.68) : vh;
+  const cssWidth = Math.max(vw, boxHeight * HERO_ASPECT);
+  const needed = cssWidth * Math.min(window.devicePixelRatio || 1, 2);
+  // 15% leeway: a copy that is slightly short of the exact need looks the
+  // same, and missing a tier by a few percent meant jumping straight to the
+  // 2MB full cover (a 1024px retina screen needs 2730px, for example).
+  return HERO_TIERS.find((w) => w >= needed * 0.85) ?? null;
+};
+
+const withHeroWidth = (url: string, width: number | null): string => {
+  if (!width) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}w=${width}`;
+};
+
 export const HeroHeader: React.FC<HeroHeaderProps> = ({
   photos,
   slug,
@@ -89,8 +122,11 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
 
   // Select hero photo (admin-selected or first photo only if gallery was empty)
   useEffect(() => {
-    // When an override is provided, the effect above has already set the hero.
-    if (heroPhotoOverride) return;
+    // A parent that passes the prop at all is choosing the hero itself, even
+    // while its choice is still null for a render. Guessing photos[0] in that
+    // gap started a full cover download that was thrown away a moment later,
+    // so a phone fetched two 4K covers on every first visit.
+    if (heroPhotoOverride !== undefined) return;
 
     if (photos.length > 0) {
       const heroId = gallerySettings.heroImageId;
@@ -114,12 +150,16 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
 
   if (!heroPhoto) return null;
 
+  const heroSrc = heroPhoto.hero_url
+    ? withHeroWidth(heroPhoto.hero_url, pickHeroWidth())
+    : heroPhoto.url;
+
   return (
     <div className="relative">
       {/* Hero Section */}
       <div className="relative left-1/2 -translate-x-1/2 w-screen h-[68svh] min-h-[380px] sm:h-screen sm:min-h-0 mb-4 sm:mb-6">
         <AuthenticatedImage
-          src={heroPhoto.hero_url || heroPhoto.url}
+          src={heroSrc}
           fallbackSrc={heroPhoto.url}
           alt={heroPhoto.filename}
           className="w-full h-full object-cover"
