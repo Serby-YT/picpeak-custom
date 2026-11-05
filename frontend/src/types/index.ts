@@ -141,6 +141,8 @@ export interface GalleryData {
     hero_divider_style?: 'wave' | 'straight' | 'angle' | 'curve' | 'none';
     // Hero image anchor position (#162) – keyword or "X% Y%" focal point
     hero_image_anchor?: string;
+    // Other photographers credited on this gallery
+    credits?: Array<{ name: string; role?: string | null; url: string }>;
   };
   categories?: PhotoCategory[];
   photos: Photo[];

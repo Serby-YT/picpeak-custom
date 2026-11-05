@@ -53,7 +53,7 @@ import { toast } from 'react-toastify';
 import { useLocalizedDate } from '../../hooks/useLocalizedDate';
 
 import { Button, Input, Card, Loading } from '../../components/common';
-import { EventCategoryManager, AdminPhotoGrid, AdminPhotoViewer, PhotoFilters, PasswordResetModal, ThemeCustomizerEnhanced, ThemeDisplay, HeroPhotoSelector, FocalPointPicker, PhotoUploadModal, FeedbackSettings, FeedbackModerationPanel, EventRenameDialog, PhotoFilterPanel, PhotoExportMenu, GalleryQRCodeModal, EventSelectionsPanel } from '../../components/admin';
+import { EventCategoryManager, AdminPhotoGrid, AdminPhotoViewer, PhotoFilters, PasswordResetModal, ThemeCustomizerEnhanced, ThemeDisplay, HeroPhotoSelector, FocalPointPicker, PhotoUploadModal, FeedbackSettings, FeedbackModerationPanel, EventRenameDialog, PhotoFilterPanel, PhotoExportMenu, GalleryQRCodeModal, EventSelectionsPanel, EventPhotographersCard } from '../../components/admin';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventsService } from '../../services/events.service';
 import { publicSettingsService } from '../../services/publicSettings.service';
@@ -1484,6 +1484,9 @@ export const EventDetailsPage: React.FC = () => {
               </dl>
             )}
           </Card>
+
+          {/* Other photographers credited in the gallery hero */}
+          <EventPhotographersCard eventId={parseInt(id!)} />
 
           {/* Share Link */}
           <Card padding="md">

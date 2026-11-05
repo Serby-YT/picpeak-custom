@@ -298,6 +298,14 @@ export const BrandingPage: React.FC = () => {
               placeholder="support@yourcompany.com"
               helperText={t('branding.supportEmailHelp')}
             />
+            <Input
+              label={t('branding.contactUrl', 'Contact link')}
+              type="url"
+              value={brandingSettings.contact_url || ''}
+              onChange={(e) => handleBrandingChange('contact_url', e.target.value)}
+              placeholder="https://serban-photo.com/card"
+              helperText={t('branding.contactUrlHelp', 'The company name under each gallery hero links here (e.g. your contact card). Leave empty for plain text.')}
+            />
             <div>
               <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                 {t('branding.footerText')}

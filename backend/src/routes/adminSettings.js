@@ -22,6 +22,7 @@ const { sanitizeCss } = require('../utils/cssSanitizer');
 const { clearShareLinkSettingsCache } = require('../services/shareLinkService');
 const { resetSecurityConfigCache } = require('../utils/authSecurity');
 const router = express.Router();
+const { cleanUrl: normalizeContactUrl } = require('./adminPhotographers');
 const { clearMaxFilesPerUploadCache, MAX_ALLOWED_FILES_PER_UPLOAD } = require('../services/uploadSettings');
 const watermarkService = require('../services/watermarkService');
 const watermarkGeneratorService = require('../services/watermarkGeneratorService');
@@ -219,7 +220,8 @@ router.put('/branding', adminAuth, requirePermission('settings.edit'), async (re
       logo_display_header,
       logo_display_hero,
       logo_display_mode,
-      hide_powered_by
+      hide_powered_by,
+      contact_url
     } = req.body;
 
     // Get current watermark settings hash for change detection
@@ -243,8 +245,15 @@ router.put('/branding', adminAuth, requirePermission('settings.edit'), async (re
       logo_display_header,
       logo_display_hero,
       logo_display_mode,
-      hide_powered_by
+      hide_powered_by,
+      // Link behind the photographer credit in the gallery hero (contact card).
+      // Absolute http(s) only, since it becomes an href on every gallery.
+      contact_url: normalizeContactUrl(contact_url)
     };
+
+    if (contact_url && !brandingSettings.contact_url) {
+      return res.status(400).json({ error: 'Contact link must be a valid http(s) address' });
+    }
 
     // Handle favicon deletion if empty string or null is provided
     if (favicon_url === '' || favicon_url === null || favicon_url === undefined) {

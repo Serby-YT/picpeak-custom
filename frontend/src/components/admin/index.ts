@@ -38,3 +38,4 @@ export { PhotoFilterPanel } from './PhotoFilterPanel';
 export { PhotoExportMenu } from './PhotoExportMenu';
 export { CssTemplateEditor } from './CssTemplateEditor';
 export { EventSelectionsPanel } from './EventSelectionsPanel';
+export { EventPhotographersCard } from './EventPhotographersCard';

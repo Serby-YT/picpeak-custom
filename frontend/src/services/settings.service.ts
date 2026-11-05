@@ -19,6 +19,8 @@ export interface BrandingSettings {
   logo_display_hero?: boolean;
   logo_display_mode?: 'logo_only' | 'text_only' | 'logo_and_text';
   hide_powered_by?: boolean;
+  // Link behind the photographer credit in the gallery hero (contact card)
+  contact_url?: string;
 }
 
 export interface ThemeSettings {
@@ -286,7 +288,8 @@ export const settingsService = {
       logo_display_header: this._parseBoolean(rawSettings.branding_logo_display_header, true),
       logo_display_hero: this._parseBoolean(rawSettings.branding_logo_display_hero, true),
       logo_display_mode: rawSettings.branding_logo_display_mode || 'logo_and_text',
-      hide_powered_by: this._parseBoolean(rawSettings.branding_hide_powered_by, false)
+      hide_powered_by: this._parseBoolean(rawSettings.branding_hide_powered_by, false),
+      contact_url: rawSettings.branding_contact_url || ''
     };
   },
 

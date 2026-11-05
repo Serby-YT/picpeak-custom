@@ -6,6 +6,7 @@ import { useLocalizedDate } from '../../hooks/useLocalizedDate';
 import { useTheme } from '../../contexts/ThemeContext';
 import { AuthenticatedImage } from '../common';
 import { HeroDivider } from './HeroDivider';
+import { HeroCredits, type GalleryCredit } from './HeroCredits';
 import { buildResourceUrl } from '../../utils/url';
 import type { Photo } from '../../types';
 import type { HeroDividerStyle } from '../../types/theme.types';
@@ -31,6 +32,10 @@ interface HeroHeaderProps {
   heroImageAnchor?: string;
   // Photographer/studio name credit shown bottom-center of the hero
   photographerName?: string;
+  // Contact card the photographer credit links to (branding contact_url)
+  photographerUrl?: string | null;
+  // Other photographers credited on this gallery
+  credits?: GalleryCredit[];
   // Download the whole gallery, offered on the hero itself so a client does not
   // have to find it in the menu.
   onDownloadAll?: () => void;
@@ -51,6 +56,8 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
   useCanvasRendering = false,
   heroImageAnchor = 'center',
   photographerName,
+  photographerUrl,
+  credits = [],
   onDownloadAll,
   isDownloading = false
 }) => {
@@ -171,7 +178,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
             sitting at bottom-3 put these underneath it and the wave cut straight
             across the label. Clear the divider's height when one is drawn; sit
             low when it is not, since 'none' and 'straight' render nothing. */}
-        {(photographerName || (allowDownloads && onDownloadAll)) && (
+        {(photographerName || credits.length > 0 || (allowDownloads && onDownloadAll)) && (
           <div
             className={`absolute inset-x-0 flex flex-col items-center gap-2 sm:gap-3 ${
               hasVisibleDivider ? 'bottom-16 sm:bottom-20' : 'bottom-3 sm:bottom-5'
@@ -188,11 +195,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
                 <span>{isDownloading ? t('gallery.preparingDownload') : t('gallery.downloadAll')}</span>
               </button>
             )}
-            {photographerName && (
-              <span className="text-white/80 text-xs sm:text-sm drop-shadow-lg">
-                {photographerName}
-              </span>
-            )}
+            <HeroCredits ownerName={photographerName} ownerUrl={photographerUrl} credits={credits} />
           </div>
         )}
 

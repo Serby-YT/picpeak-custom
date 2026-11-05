@@ -557,3 +557,85 @@
   opacity: 0.65;
   cursor: default;
 }
+
+/* Credits under the hero download button: the studio (linked to its contact
+   card) and any other photographers on the event (linked to their portfolio).
+   Stacked on phones; one row with thin separators from sm up. */
+.gallery-hero-credits {
+  list-style: none;
+  margin: 0;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  max-width: 100%;
+  color: rgba(247, 245, 241, 0.85);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: center;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+}
+
+.gallery-hero-credits__item {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.gallery-hero-credits__role {
+  opacity: 0.7;
+}
+
+.gallery-hero-credits__sep {
+  margin: 0 0.4em;
+  opacity: 0.7;
+}
+
+.gallery-hero-credits__link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(247, 245, 241, 0.35);
+  text-underline-offset: 3px;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+  /* Comfortable tap target without changing the line rhythm */
+  display: inline-block;
+  padding: 0.3rem 0.25rem;
+}
+
+.gallery-hero-credits__text {
+  display: inline-block;
+  padding: 0.3rem 0.25rem;
+}
+
+.gallery-hero-credits__link:hover {
+  color: #fff;
+  text-decoration-color: rgba(247, 245, 241, 0.9);
+}
+
+.gallery-hero-credits__link:focus-visible {
+  outline: 2px solid rgba(247, 245, 241, 0.9);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (min-width: 640px) {
+  .gallery-hero-credits {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .gallery-hero-credits__item + .gallery-hero-credits__item::before {
+    content: "|";
+    margin-right: 0.5rem;
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-hero-credits__link {
+    transition: none;
+  }
+}

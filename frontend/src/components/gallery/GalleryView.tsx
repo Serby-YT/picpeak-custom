@@ -223,6 +223,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
         logo_display_hero: settingsData.branding_logo_display_hero !== false,
         logo_display_mode: settingsData.branding_logo_display_mode || 'logo_and_text',
         hide_powered_by: settingsData.branding_hide_powered_by === true,
+        contact_url: settingsData.branding_contact_url || null,
       });
     }
   }, [settingsData]);
@@ -654,6 +655,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
           heroImageAnchor={data?.event?.hero_image_anchor || 'center'}
           onLogout={logout}
           photographerName={brandingSettings?.company_name}
+          photographerUrl={brandingSettings?.contact_url}
+          credits={data?.event?.credits}
         />
 
         {/* Whole gallery in parts, on phones */}
@@ -843,6 +846,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ slug, event }) => {
             headerStyle={data?.event?.header_style || theme.headerStyle}
             heroDividerStyle={data?.event?.hero_divider_style || theme.heroDividerStyle || 'wave'}
             heroImageAnchor={data?.event?.hero_image_anchor || 'center'}
+            photographerName={brandingSettings?.company_name}
+            photographerUrl={brandingSettings?.contact_url}
+            credits={data?.event?.credits}
             belowHero={showCategoryBar ? (
               <GalleryCategoryBar
                 categories={categoriesWithPhotos}

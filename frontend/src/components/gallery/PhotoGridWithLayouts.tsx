@@ -1,3 +1,4 @@
+import type { GalleryCredit } from './HeroCredits';
 import React, { useState, useEffect } from 'react';
 import { Package, Play } from 'lucide-react';
 import { toast as toastify } from 'react-toastify';
@@ -70,6 +71,8 @@ interface PhotoGridWithLayoutsProps {
   onLogout?: () => void;
   // Photographer/studio name credit shown bottom-center of the hero
   photographerName?: string;
+  photographerUrl?: string | null;
+  credits?: GalleryCredit[];
   // Rendered directly under the hero (or at the top when there is no hero)
   belowHero?: React.ReactNode;
 }
@@ -107,6 +110,8 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
   heroImageAnchor = 'center',
   onLogout,
   photographerName,
+  photographerUrl,
+  credits,
   belowHero
 }) => {
   const { t } = useTranslation();
@@ -299,6 +304,8 @@ export const PhotoGridWithLayouts: React.FC<PhotoGridWithLayoutsProps> = ({
           useCanvasRendering={useCanvasRendering}
           heroImageAnchor={heroImageAnchor}
           photographerName={photographerName}
+          photographerUrl={photographerUrl}
+          credits={credits}
           onDownloadAll={onDownloadAll}
           isDownloading={isDownloading}
         />

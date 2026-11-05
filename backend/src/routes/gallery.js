@@ -4,6 +4,7 @@ const { formatBoolean } = require('../utils/dbCompat');
 const archiver = require('archiver');
 const path = require('path');
 const router = express.Router();
+const { loadEventCredits } = require('./adminPhotographers');
 const watermarkService = require('../services/watermarkService');
 const watermarkGeneratorService = require('../services/watermarkGeneratorService');
 const { verifyGalleryAccess } = require('../middleware/gallery');
@@ -372,6 +373,19 @@ router.get('/:slug/photos', verifyGalleryAccess, async (req, res) => {
     };
     
 
+    // Other photographers credited on this gallery (shown in the hero).
+    // A missing table (migration not run yet) must never break the gallery.
+    let credits = [];
+    try {
+      credits = (await loadEventCredits(req.event.id)).map(c => ({
+        name: c.name,
+        role: c.role || null,
+        url: c.portfolio_url
+      }));
+    } catch (creditError) {
+      console.error('Error loading gallery credits:', creditError.message);
+    }
+
     res.json({
       event: {
         id: req.event.id,
@@ -396,6 +410,7 @@ router.get('/:slug/photos', verifyGalleryAccess, async (req, res) => {
         header_style: req.event.header_style || 'standard',
         hero_divider_style: req.event.hero_divider_style || 'wave',
         hero_image_anchor: req.event.hero_image_anchor || 'center',
+        credits,
         ...protectionSettings
       },
       categories: categories,
