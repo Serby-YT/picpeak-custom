@@ -517,6 +517,62 @@ async function ensureHeroImage(photo) {
   return null;
 }
 
+// Smaller copies of the photo-viewer image for smaller screens. The display
+// copy fits inside 2560x2560 (~570KB); a phone drawing a landscape photo 375px
+// wide needs a fraction of that. Closed set: each size is a file on disk.
+const DISPLAY_SIZES = [1080, 1600, 2048];
+
+/**
+ * The display copy fitted inside a size x size box, built on first request
+ * from the 2560px display copy and cached in display/s<size>/. Returns null
+ * for a size outside the set, so the caller serves the full display copy.
+ * Rebuilt when the display copy is newer.
+ */
+async function ensureDisplayAtSize(displayRelPath, requestedSize) {
+  const size = parseInt(requestedSize, 10);
+  if (!DISPLAY_SIZES.includes(size) || !displayRelPath) return null;
+
+  const sourcePath = path.join(getStoragePath(), displayRelPath);
+  const tierDir = path.join(getDisplayPath(), `s${size}`);
+  const tierPath = path.join(tierDir, path.basename(sourcePath));
+
+  let sourceStats;
+  try {
+    sourceStats = await fs.stat(sourcePath);
+  } catch (error) {
+    return null;
+  }
+
+  try {
+    const stats = await fs.stat(tierPath);
+    if (stats.size > 0 && stats.mtimeMs >= sourceStats.mtimeMs) {
+      return path.relative(getStoragePath(), tierPath);
+    }
+  } catch (err) {
+    // Not built yet.
+  }
+
+  await fs.mkdir(tierDir, { recursive: true });
+  const tempPath = `${tierPath}.${process.pid}.${Date.now()}.tmp`;
+
+  try {
+    await sharp(sourcePath, { failOnError: false })
+      .resize(size, size, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 84, effort: 4 })
+      .toFile(tempPath);
+
+    const stats = await fs.stat(tempPath);
+    if (stats.size === 0) throw new Error('Generated display copy is empty');
+
+    await fs.rename(tempPath, tierPath);
+    return path.relative(getStoragePath(), tierPath);
+  } catch (error) {
+    logger.error(`Failed to build ${size}px display copy from ${displayRelPath}: ${error.message}`);
+    await fs.unlink(tempPath).catch(() => {});
+    return null;
+  }
+}
+
 // Smaller copies of the cover for smaller screens. The full hero is 3840px,
 // about 1.2MB, and a phone was downloading it to fill a 375px-wide box. Closed
 // set for the same reason as THUMBNAIL_WIDTHS: each width is a file on disk.
@@ -884,6 +940,8 @@ module.exports = {
   ensureHeroImage,
   ensureHeroAtWidth,
   HERO_WIDTHS,
+  ensureDisplayAtSize,
+  DISPLAY_SIZES,
   generateDisplayImage,
   ensureDisplayImage,
   extractCaptureDate

@@ -29,6 +29,33 @@ interface PhotoLightboxProps {
 const SLIDESHOW_INTERVAL_MS = 4000;
 const SWIPE_THRESHOLD_PX = 50;
 
+// Box sizes the photo endpoint will build on request (the photo fits inside a
+// square of that size); anything larger gets the full 2560px display copy.
+// Kept in step with DISPLAY_SIZES on the backend.
+const VIEWER_TIERS = [1080, 1600, 2048];
+
+// The viewer shows the whole photo (object-contain), so what it needs is the
+// photo's long edge at the size it is actually drawn on this screen. A
+// landscape photo on a portrait phone is only 375px wide: sending it 2560px
+// (about 570KB) was seven times the pixels the screen could show. DPR capped
+// at 2 and 15% leeway, as for the cover.
+const pickViewerSize = (photo: Photo): number | null => {
+  if (typeof window === 'undefined' || !photo.width || !photo.height) return null;
+  const scale = Math.min(window.innerWidth / photo.width, window.innerHeight / photo.height, 1);
+  const needed = Math.max(photo.width, photo.height) * scale * Math.min(window.devicePixelRatio || 1, 2);
+  return VIEWER_TIERS.find((s) => s >= needed * 0.85) ?? null;
+};
+
+// Zoomed in, the full display copy is worth its weight: that is when someone
+// is checking a face or a detail.
+const viewerSrc = (photo: Photo, zoomed: boolean): string => {
+  const url = photo.url;
+  if (zoomed || !url || !url.includes('/photo/')) return url;
+  const size = pickViewerSize(photo);
+  if (!size) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}w=${size}`;
+};
+
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   photos,
   initialIndex,
@@ -499,7 +526,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
           />
         ) : (
           <AuthenticatedImage
-            src={currentPhoto.url}
+            src={viewerSrc(currentPhoto, zoom > 1)}
             alt={currentPhoto.filename}
             fallbackSrc={currentPhoto.thumbnail_url || undefined}
             placeholderSrc={currentPhoto.thumbnail_url || undefined}

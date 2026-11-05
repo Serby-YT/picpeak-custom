@@ -16,7 +16,7 @@ const { buildLayout, splitIntoParts, withFileStats, sendResumableZip } = require
 const { getEventShareToken, resolveShareIdentifier, buildShareLinkVariants } = require('../services/shareLinkService');
 const { handleAsync } = require('../utils/routeHelpers');
 const { NotFoundError } = require('../utils/errors');
-const { ensureThumbnail, ensureThumbnailAtWidth, ensureHeroImage, ensureHeroAtWidth, ensureDisplayImage } = require('../services/imageProcessor');
+const { ensureThumbnail, ensureThumbnailAtWidth, ensureHeroImage, ensureHeroAtWidth, ensureDisplayImage, ensureDisplayAtSize } = require('../services/imageProcessor');
 const { timingSafeEqualStr } = require('../utils/timingSafe');
 
 // Get storage path from environment or default
@@ -1062,11 +1062,14 @@ router.get('/:slug/photo/:photoId',
         const displayRelPath = await ensureDisplayImage(filePath);
 
         if (displayRelPath) {
-          const displayAbsolutePath = path.join(getStoragePath(), displayRelPath);
+          // A screen-sized copy when the viewer asks for one of
+          // DISPLAY_SIZES; the full display copy otherwise or on failure.
+          const sizedRelPath = req.query.w ? await ensureDisplayAtSize(displayRelPath, req.query.w) : null;
+          const displayAbsolutePath = path.join(getStoragePath(), sizedRelPath || displayRelPath);
           res.set({
             'Content-Type': 'image/webp',
             'Cache-Control': 'private, max-age=7200',
-            'ETag': etag,
+            'ETag': sizedRelPath ? etag.replace(/"$/, `-s${req.query.w}"`) : etag,
             'X-Protection-Level': 'basic'
           });
           return res.sendFile(displayAbsolutePath);
